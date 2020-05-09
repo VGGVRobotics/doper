@@ -3,7 +3,6 @@ all the equations below assumes that the agent is a ball with radius R, and the 
 is being produced only by L2 distance between current agents location and target point.
 The presence of rolling friction is also assumed
 """
-from typing import Tuple, List
 
 import taichi as ti
 import numpy as np
@@ -16,125 +15,73 @@ g = 9.8
 
 
 @ti.func
-def compute_potential(curr_coordinate: ti.var,
-                      target_coordinate: ti.var,
-                      ) -> float:
-    """Computes L2 potential value
-
-    Args:
-        curr_coordinate (ti.var): current agent position (center of masses)
-        target_coordinate (ti.var): target point
-
-    Returns:
-        float: L2 potential
+def compute_potential(curr_coordinate, target_coordinate):
     """
-
+    Computes L2 potential value
+    curr_coordinate: current agent position (center of masses), ti.val (dim,)
+    target_coordinate: target point, ti.val (dim,)
+    """
     return ti.mean((target_coordinate - curr_coordinate) ** 2)
 
 
 @ti.func
-def cumpute_l2_force(curr_coordinate: ti.var,
-                     target_coordinate: ti.var,
-                     ) -> float:
-    """Computes force produced by L2 potential
-
-    Args:
-        curr_coordinate (ti.var): current agent position (center of masses)
-        target_coordinate (ti.var): target point
-
-    Returns:
-        float: the amount of force produced by L2 potential
+def cumpute_l2_force(curr_coordinate, target_coordinate):
+    """
+    Computes force produced by L2 potential
+    curr_coordinate: current agent position (center of masses), ti.val (dim,)
+    target_coordinate: target point, ti.val (dim,)
     """
     return 2 * (target_coordinate - curr_coordinate)
 
 
 @ti.func
-def compute_rolling_friction_force(velocity_direction: int,
-                                   mass: float,
-                                   g: float,
-                                   f: float,
-                                   radius: float,
-                                   ) -> float:
-    """Computes rolling friction force value, flat land assumed
-
-    Args:
-        velocity_direction (int): velocity sign, [-1, 0 or 1]
-        mass (float): balls mass, kilogram
-        g (float): gravitational acceleration, metre / second ^ 2)
-        f (float): rolling friction coefficient, metre
-        radius (float): balls radius, metre
-
-    Returns:
-        float: the amount of the rolling friction force
+def compute_rolling_friction_force(velocity_direction, mass, g, f, radius):
     """
-    assert velocity_direction in [-1, 0, 1], 'velocity_direction should be in [-1, 0, 1]'
+    Computes rolling friction force value, flat land assumed
+    velocity_direction: int, -1 or 1
+    mass: balls mass, float (1,)
+    g: gravitational acceleration, float (1,)
+    f: rolling friction coefficient (meters), float (1,)
+    radius: balls radius (meters), float (1,)
+    """
     N = m * g  # normal force
     return - velocity_direction * f * N / radius
 
 
 @ti.func
-def compute_acceleration(forces: List,
-                         mass: float,
-                         ) -> float:
-    """compute acceleration given list of forces and mass
-
-    Args:
-        forces (list): list of forces
-        mass (float): balls mass, kilogram
-
-    Returns:
-        float: balls acceleration, metre / second ^ 2
-    """
-    total_force = 0
-    for f in forces:
-        total_force += f
-    return total_force / m
+def compute_acceleration(x, x_target, m, v, F_fr):
+    return (2 * (x_target - x) - np.sign(v.to_numpy()) * F_fr) / m
 
 
 @ti.func
-def sim_step(curr_coordinate: ti.var,
-             target_coordinate: ti.var,
-             velocity: ti.var,
-             constants: dict,
-             dt: float,
-             ) -> Tuple[ti.var, ti.var]:
-    """Makes one step of the simulation
-
-    Args:
-        curr_coordinate (ti.var): current agent position (center of masses)
-        target_coordinate (ti.var): target point
-        velocity (ti.var): balls velocity
-        constants (dict): simulation constants
-        dt (float): time intrval
-
-    Returns:
-        list: [description]
+def update_state(curr_coordinate,
+                 target_coordinate,
+                 mass,
+                 velocity,
+                 F_fr,
+                 dt,
+                ):
     """
-    l2_force = cumpute_l2_force(curr_coordinate,
-                                target_coordinate,
-                                )
-    friction_force = compute_rolling_friction_force(np.sign(velocity),
-                                                    constants['mass'],
-                                                    constants['g'],
-                                                    constants['f'],
-                                                    constants['radius'],
-                                                    )
-    acceleration = compute_acceleration([l2_force,
-                                         friction_force],
-                                        constants['mass'],
-                                        )
-    velocity += acceleration * dt
+    curr_coordinate: current agent position (center of masses), ti.val (dim,)
+    target_coordinate: target point, ti.val (dim,)
+    mass: balls mass, float (1,)
+    velocity: ahents velocity vector, ti.val (dim,)
+
+    """
+    a_curr = compute_acceleration(curr_coordinate,
+                                  target_coordinate,
+                                  mass,
+                                  velocity,
+                                  F_fr,
+                                  )
+    velocity += a_curr * dt
     curr_coordinate += velocity * dt
     return curr_coordinate, velocity
 
 
 @ti.kernel
-def run_simulation(x0, v0, target_coordinate):
-    t0 = 0
-    x = x0.copy()
-    v = v0.copy()
-    for idx, t1 in np.linspace(0, 20, 4000):
-        dt = t1 - t0
+def run_simulation():
+    for idx, t1 in np.linspace(0, sim_length, num_steps)
         update_state()
 
 
