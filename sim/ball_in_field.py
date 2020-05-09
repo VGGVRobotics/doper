@@ -16,72 +16,102 @@ g = 9.8
 
 @ti.func
 def compute_potential(curr_coordinate, target_coordinate):
+    """Computes L2 potential value
+
+    Args:
+        curr_coordinate (float): current agent position (center of masses)
+        target_coordinate (float): target point
+
+    Returns:
+        float: L2 potential
     """
-    Computes L2 potential value
-    curr_coordinate: current agent position (center of masses), ti.val (dim,)
-    target_coordinate: target point, ti.val (dim,)
-    """
+
     return ti.mean((target_coordinate - curr_coordinate) ** 2)
 
 
 @ti.func
 def cumpute_l2_force(curr_coordinate, target_coordinate):
-    """
-    Computes force produced by L2 potential
-    curr_coordinate: current agent position (center of masses), ti.val (dim,)
-    target_coordinate: target point, ti.val (dim,)
+    """Computes force produced by L2 potential
+
+    Args:
+        curr_coordinate (float): current agent position (center of masses)
+        target_coordinate (float): target point
+
+    Returns:
+        float: the amount of force produced by L2 potential
     """
     return 2 * (target_coordinate - curr_coordinate)
 
 
 @ti.func
 def compute_rolling_friction_force(velocity_direction, mass, g, f, radius):
+    """Computes rolling friction force value, flat land assumed
+
+    Args:
+        velocity_direction (int): velocity sign, [-1, 0 or 1]
+        mass (float): balls mass, kilogram
+        g (float): gravitational acceleration, metre / second ^ 2)
+        f (float): rolling friction coefficient, metre
+        radius (float): balls radius, metre
+
+    Returns:
+        float: the amount of the rolling friction force
     """
-    Computes rolling friction force value, flat land assumed
-    velocity_direction: int, -1 or 1
-    mass: balls mass, float (1,)
-    g: gravitational acceleration, float (1,)
-    f: rolling friction coefficient (meters), float (1,)
-    radius: balls radius (meters), float (1,)
-    """
+    assert velocity_direction in [-1, 0, 1], 'velocity_direction should be in [-1, 0, 1]'
     N = m * g  # normal force
     return - velocity_direction * f * N / radius
 
 
 @ti.func
-def compute_acceleration(x, x_target, m, v, F_fr):
-    return (2 * (x_target - x) - np.sign(v.to_numpy()) * F_fr) / m
+def compute_acceleration(forces, mass):
+    """compute acceleration given list of forces and mass
+
+    Args:
+        forces (list): list of forces
+        mass (float): balls mass, kilogram
+
+    Returns:
+        float: balls acceleration, metre / second ^ 2
+    """
+    total_force = 0
+    for f in forces:
+        total_force += f
+    return total_force / m
 
 
 @ti.func
 def update_state(curr_coordinate,
                  target_coordinate,
-                 mass,
                  velocity,
-                 F_fr,
+                 constants,
                  dt,
-                ):
-    """
-    curr_coordinate: current agent position (center of masses), ti.val (dim,)
-    target_coordinate: target point, ti.val (dim,)
-    mass: balls mass, float (1,)
-    velocity: ahents velocity vector, ti.val (dim,)
+                 ):
 
-    """
-    a_curr = compute_acceleration(curr_coordinate,
-                                  target_coordinate,
-                                  mass,
-                                  velocity,
-                                  F_fr,
-                                  )
-    velocity += a_curr * dt
+    l2_force = cumpute_l2_force(curr_coordinate,
+                                target_coordinate,
+                                )
+    friction_force = compute_rolling_friction_force(np.sign(velocity),
+                                                    constants['mass'],
+                                                    constants['g'],
+                                                    constants['f'],
+                                                    constants['radius'],
+                                                    )
+    acceleration = compute_acceleration([l2_force,
+                                         friction_force],
+                                        constants['mass'],
+                                        )
+    velocity += acceleration * dt
     curr_coordinate += velocity * dt
     return curr_coordinate, velocity
 
 
 @ti.kernel
-def run_simulation():
-    for idx, t1 in np.linspace(0, sim_length, num_steps)
+def run_simulation(x0, v0, target_coordinate):
+    t0 = 0
+    x = x0.copy()
+    v = v0.copy()
+    for idx, t1 in np.linspace(0, 20, 4000):
+        dt = t1 - t0
         update_state()
 
 
