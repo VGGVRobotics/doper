@@ -3,6 +3,7 @@ all the equations below assumes that the agent is a ball with radius R, and the 
 is being produced only by L2 distance between current agents location and target point.
 The presence of rolling friction is also assumed
 """
+from typing import Tuple, List
 
 import taichi as ti
 import numpy as np
@@ -15,12 +16,14 @@ g = 9.8
 
 
 @ti.func
-def compute_potential(curr_coordinate, target_coordinate):
+def compute_potential(curr_coordinate: ti.var,
+                      target_coordinate: ti.var,
+                      ) -> float:
     """Computes L2 potential value
 
     Args:
-        curr_coordinate (float): current agent position (center of masses)
-        target_coordinate (float): target point
+        curr_coordinate (ti.var): current agent position (center of masses)
+        target_coordinate (ti.var): target point
 
     Returns:
         float: L2 potential
@@ -30,12 +33,14 @@ def compute_potential(curr_coordinate, target_coordinate):
 
 
 @ti.func
-def cumpute_l2_force(curr_coordinate, target_coordinate):
+def cumpute_l2_force(curr_coordinate: ti.var,
+                     target_coordinate: ti.var,
+                     ) -> float:
     """Computes force produced by L2 potential
 
     Args:
-        curr_coordinate (float): current agent position (center of masses)
-        target_coordinate (float): target point
+        curr_coordinate (ti.var): current agent position (center of masses)
+        target_coordinate (ti.var): target point
 
     Returns:
         float: the amount of force produced by L2 potential
@@ -44,7 +49,12 @@ def cumpute_l2_force(curr_coordinate, target_coordinate):
 
 
 @ti.func
-def compute_rolling_friction_force(velocity_direction, mass, g, f, radius):
+def compute_rolling_friction_force(velocity_direction: int,
+                                   mass: float,
+                                   g: float,
+                                   f: float,
+                                   radius: float,
+                                   ) -> float:
     """Computes rolling friction force value, flat land assumed
 
     Args:
@@ -63,7 +73,9 @@ def compute_rolling_friction_force(velocity_direction, mass, g, f, radius):
 
 
 @ti.func
-def compute_acceleration(forces, mass):
+def compute_acceleration(forces: List,
+                         mass: float,
+                         ) -> float:
     """compute acceleration given list of forces and mass
 
     Args:
@@ -80,13 +92,24 @@ def compute_acceleration(forces, mass):
 
 
 @ti.func
-def update_state(curr_coordinate,
-                 target_coordinate,
-                 velocity,
-                 constants,
-                 dt,
-                 ):
+def sim_step(curr_coordinate: ti.var,
+             target_coordinate: ti.var,
+             velocity: ti.var,
+             constants: dict,
+             dt: float,
+             ) -> Tuple[ti.var, ti.var]:
+    """Makes one step of the simulation
 
+    Args:
+        curr_coordinate (ti.var): current agent position (center of masses)
+        target_coordinate (ti.var): target point
+        velocity (ti.var): balls velocity
+        constants (dict): simulation constants
+        dt (float): time intrval
+
+    Returns:
+        list: [description]
+    """
     l2_force = cumpute_l2_force(curr_coordinate,
                                 target_coordinate,
                                 )
