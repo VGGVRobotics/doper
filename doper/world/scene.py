@@ -1,36 +1,42 @@
 from typing import List, Union, Tuple
 import numpy as np
 from .shapes import Polygon
-from .checks import batch_line_ray_intersection_point
+from .checks import batch_line_ray_intersection_point, polygons_in_rect_area
 
 
 class Scene:
     def __init__(self, polygons: List[Polygon]):
-        self._polys = polygons
+        self._polygons = polygons
 
-    def get_polygons(self, center: np.ndarray = None, radius: float = None) -> List[Polygon]:
+    def get_polygons_segments(self, polygons: List[Polygon]) -> np.ndarray:
+        return np.concatenate([p.segments for p in polygons], axis=0)
+
+    def get_polygons_in_area(
+        self,
+        lower_left: Union[np.ndarray, Tuple[float, float]],
+        upper_right: Union[np.ndarray, Tuple[float, float]],
+    ) -> List[Polygon]:
+        return polygons_in_rect_area(self._polygons, lower_left, upper_right)
+
+    def get_polygons_in_radius(
+        self, center: Union[np.ndarray, Tuple[float, float]], radius: float
+    ) -> List[Polygon]:
         # TODO: add inside radii filtering
-        return self._polys
+        return self._polygons
+
+    def get_all_polygons(self) -> List[Polygon]:
+        return self._polygons
 
     def is_point_inside_any_polygon(self, points: np.ndarray) -> np.ndarray:
         # TODO: can be optimized
-        x_min = points[:, 0].min()
-        y_min = points[:, 1].min()
-        x_max = points[:, 0].max()
-        y_max = points[:, 1].max()
-
-        def in_bounding_rect(polygon):
-            segments = polygon.segments
-            is_point_inside_rect = (
-                (segments[:, :, 0] >= x_min)
-                * (segments[:, :, 1] >= y_min)
-                * (segments[:, :, 0] <= x_max)
-                * (segments[:, :, 1] <= y_max)
-            )
-
-            return np.any(is_point_inside_rect)
-
-        valid_polygons = list(filter(in_bounding_rect, self._polys))
+        if len(points) > 1:
+            x_min = points[:, 0].min()
+            y_min = points[:, 1].min()
+            x_max = points[:, 0].max()
+            y_max = points[:, 1].max()
+            valid_polygons = polygons_in_rect_area(self._polygons, (x_min, y_min), (x_max, y_max))
+        else:
+            valid_polygons = self.get_all_polygons()
         all_segments = np.concatenate([p.segments for p in valid_polygons], axis=0)
         directions = np.array([1, 0], dtype=np.float32).reshape(1, -1).repeat(len(points), axis=0)
         intersection_points = batch_line_ray_intersection_point(points, directions, all_segments)
