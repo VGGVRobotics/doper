@@ -12,8 +12,8 @@ if __name__ == "__main__":
     scene = Scene([a])
     sensor = UndirectedRangeSensor(10, 1)
     for i in range(6):
-        ranges, points = sensor.get_observation((i * 5, 8), scene, return_intersection_points=True)
-        plt.scatter(i * 5, 8, s=100, c="black"),
+        ranges, points = sensor.get_observation((i * 5, 25), scene, return_intersection_points=True)
+        plt.scatter(i * 5, 25, s=100, c="black"),
         for s in a.segments:
             plt.scatter(s[:, 0], s[:, 1], c="red")
         points = points

@@ -3,8 +3,13 @@ import numpy as np
 from .scene import Scene
 from .checks import batch_line_ray_intersection_point
 
+# General sensor type, just for typehints
+class Sensor:
+    def get_observation(self) -> None:
+        pass
 
-class SimpleRangeSensor:
+
+class SimpleRangeSensor(Sensor):
     def __init__(self, distance_range: float, angle_range: float, angle_step: float) -> None:
         self._distance_range = distance_range
         self._angle_range_rad = angle_range / 180 * np.pi

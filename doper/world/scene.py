@@ -28,7 +28,7 @@ class Scene:
         return self._polygons
 
     def is_point_inside_any_polygon(self, points: np.ndarray) -> np.ndarray:
-        # TODO: can be optimized
+        # There is a problem if we have a fence around the scene - any point inside will return true
         if len(points) > 1:
             x_min = points[:, 0].min()
             y_min = points[:, 1].min()
@@ -50,27 +50,3 @@ class Scene:
             is_inner_point = np.logical_or(is_inner_point, num_intersections % 2 != 0)
             idx += len(p.segments)
         return is_inner_point
-
-
-class Rasterizer:
-    def __init__(self, points_per_meter: int = 2, frustrum_size: Tuple[int] = (64, 48)) -> None:
-        self._points_per_meter = points_per_meter
-        self._frutstrum_size = frustrum_size
-        self._frame = np.zeros(
-            (frustrum_size[1] * points_per_meter, frustrum_size[0] * points_per_meter, 3)
-        )
-        xx = np.linspace(0, frustrum_size[0], frustrum_size[0] * points_per_meter)
-        yy = np.linspace(0, frustrum_size[1], frustrum_size[1] * points_per_meter)
-        gx, gy = np.meshgrid(xx, yy, indexing="xy")
-        self._coords = np.concatenate([gx[..., np.newaxis], gy[..., np.newaxis]], axis=-1)
-
-    def rasterize(
-        self, scene: Scene, frustrum_left_lower_coords: Union[np.ndarray, Tuple[float]]
-    ) -> np.ndarray:
-        frustrum_left_lower_coords = np.array(frustrum_left_lower_coords)
-        is_inner = scene.is_point_inside_any_polygon(
-            self._coords.reshape(-1, 2) + frustrum_left_lower_coords
-        )
-
-        self._frame[is_inner.reshape(self._coords.shape[:2])[::-1, :]] = np.array([1, 1, 0])
-        return self._frame
