@@ -57,5 +57,14 @@ def line_begin_end(line: Line, scale: float, width: int, height: int) -> List[Tu
     ]
 
 
-def get_svg_scene(fname: str, px_per_meter: float = 10) -> Scene:
+def get_svg_scene(fname: str, px_per_meter: float = 50) -> Scene:
+    """Loads scene representation from svg file
+
+    Args:
+        fname (str): path to svg file
+        px_per_meter (float, optional): pixels per meters scale. Defaults to 50.
+
+    Returns:
+        Scene: scene representation instance
+    """
     return Scene(svg2polygons(fname, scale=px_per_meter))
