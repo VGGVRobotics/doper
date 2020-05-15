@@ -14,15 +14,12 @@ if __name__ == "__main__":
     while True:
         gui.ti_gui.get_event()
         if gui.ti_gui.event is not None:
-            print(gui.ti_gui.event.key)
             if gui.ti_gui.event.key == "a":
                 sensor_pos[0] -= 0.01
             elif gui.ti_gui.event.key == "d":
                 sensor_pos[0] += 0.01
             elif gui.ti_gui.event.key == "w":
-                print("QQ")
                 sensor_pos[1] += 0.01
-                print(sensor_pos)
             elif gui.ti_gui.event.key == "s":
                 sensor_pos[1] -= 0.01
         ranges, points = sensor.get_observation(sensor_pos, scene, True)
