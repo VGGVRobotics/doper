@@ -108,7 +108,7 @@ def run_simulation():
 @ti.layout
 def place():
     ti.root.dense(ti.l, sim_steps).dense(ti.i, 1).place(x, v, acceleration)
-    ti.root.place(target_x, l2_force, friction_force, velocity_direction)
+    ti.root.place(target_x, velocity_direction)
     ti.root.place(dt, radius, g, f, ro, volume, mass)
 
 
@@ -122,8 +122,6 @@ if __name__ == "__main__":
     x = ti.Vector(2, dt=ti.f32)
     v = ti.Vector(2, dt=ti.f32)
     acceleration = ti.Vector(2, dt=ti.f32)
-    l2_force = ti.Vector(2, dt=ti.f32)
-    friction_force = ti.Vector(2, dt=ti.f32)
 
     dt = ti.var(dt=ti.f32)
     radius = ti.var(dt=ti.f32)
