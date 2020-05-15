@@ -29,7 +29,7 @@ class Scene:
         lower_left: Union[np.ndarray, Tuple[float, float]],
         upper_right: Union[np.ndarray, Tuple[float, float]],
     ) -> List[Polygon]:
-        """Returns scene polygons in rectangular area
+        """Returns scene polygons inside rectangular area
 
         Args:
             lower_left (Union[np.ndarray, Tuple[float, float]]): ROI left lower corner
@@ -64,7 +64,7 @@ class Scene:
         return self._polygons
 
     def is_point_inside_any_polygon(self, points: np.ndarray) -> np.ndarray:
-        """Checks if given points lie inside of any polygon.
+        """Checks if given points lie inside any polygon.
 
         Args:
             points (np.ndarray): [n_points, 2] array of points coordinates
