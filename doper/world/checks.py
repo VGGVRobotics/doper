@@ -1,6 +1,5 @@
 from typing import List, Union, Tuple
 import numpy as np
-from matplotlib import pyplot as plt
 from .shapes import Polygon
 
 # https://gist.github.com/danieljfarrell/faf7c4cafd683db13cbc
@@ -11,8 +10,20 @@ from .shapes import Polygon
 def batch_line_ray_intersection_point(
     ray_origins: np.ndarray, ray_directions: np.ndarray, segments: np.ndarray
 ) -> np.ndarray:
-    # Ray-Line Segment Intersection Test in 2D
-    # http://bit.ly/1CoxdrG
+    """Function to check intersection between multiple rays and multiple segments.
+
+    See algorithm description here  http://bit.ly/1CoxdrG
+
+    Args:
+        ray_origins (np.ndarray): [n_rays, 2] array of ray origin points
+        ray_directions (np.ndarray): [n_rays, 2] array of ray directions, may not
+            be normalized
+        segments (np.ndarray): [n_segments, 2, 2] array of segments endpoints
+
+    Returns:
+        np.ndarray: [n_rays, n_segments, 2] array of segment intersection points.
+                    Contains np.inf if ray does not intersect the segment.
+    """
     ray_directions = ray_directions / np.linalg.norm(ray_directions, axis=-1)[..., np.newaxis]
     v1 = ray_origins[:, np.newaxis, :] - segments[:, 0, :]
     v2 = segments[:, 1, :] - segments[:, 0, :]
@@ -38,7 +49,17 @@ def polygons_in_rect_area(
     polygons: List[Polygon],
     lower_left: Union[np.ndarray, Tuple[float, float]],
     upper_right: Union[np.ndarray, Tuple[float, float]],
-):
+) -> List[Polygon]:
+    """Returns only polygons with at least one vertex in given rectangular area
+
+    Args:
+        polygons (List[Polygon]): list of polygons
+        lower_left (Union[np.ndarray, Tuple[float, float]]): (x, y) lower left corner of rectangular area
+        upper_right (Union[np.ndarray, Tuple[float, float]]): (x, y) upper right corner of rectangular area
+
+    Returns:
+        List[Polygon]: filtered list of polygons
+    """
     res = []
     x_min, y_min = lower_left
     x_max, y_max = upper_right

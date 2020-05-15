@@ -6,9 +6,22 @@ from .checks import batch_line_ray_intersection_point, polygons_in_rect_area
 
 class Scene:
     def __init__(self, polygons: List[Polygon]):
+        """Scene representation. Can perfom basic geometric queries.
+
+        Args:
+            polygons (List[Polygon]): list of polygones
+        """
         self._polygons = polygons
 
     def get_polygons_segments(self, polygons: List[Polygon]) -> np.ndarray:
+        """Get concatenated segments of given polygones.
+
+        Args:
+            polygons (List[Polygon]): list of polygons
+
+        Returns:
+            np.ndarray: [n_segments, 2, 2] array of segment endpoints
+        """
         return np.concatenate([p.segments for p in polygons], axis=0)
 
     def get_polygons_in_area(
@@ -16,19 +29,51 @@ class Scene:
         lower_left: Union[np.ndarray, Tuple[float, float]],
         upper_right: Union[np.ndarray, Tuple[float, float]],
     ) -> List[Polygon]:
+        """Returns scene polygons in rectangular area
+
+        Args:
+            lower_left (Union[np.ndarray, Tuple[float, float]]): ROI left lower corner
+            upper_right (Union[np.ndarray, Tuple[float, float]]): ROI right upper corner
+
+        Returns:
+            List[Polygon]: list of polygons
+        """
         return polygons_in_rect_area(self._polygons, lower_left, upper_right)
 
     def get_polygons_in_radius(
         self, center: Union[np.ndarray, Tuple[float, float]], radius: float
     ) -> List[Polygon]:
+        """TBD
+
+        Args:
+            center (Union[np.ndarray, Tuple[float, float]]): center of the area
+            radius (float): radius of the area
+
+        Returns:
+            List[Polygon]: list of polygons
+        """
         # TODO: add inside radii filtering
         return self._polygons
 
     def get_all_polygons(self) -> List[Polygon]:
+        """Returns all scene polygons
+
+        Returns:
+            List[Polygon]: list of polygons
+        """
         return self._polygons
 
     def is_point_inside_any_polygon(self, points: np.ndarray) -> np.ndarray:
-        # There is a problem if we have a fence around the scene - any point inside will return true
+        """Checks if given points lie inside of any polygon.
+
+        Args:
+            points (np.ndarray): [n_points, 2] array of points coordinates
+
+        Returns:
+            np.ndarray: [n_points] bool array
+        """
+        # There is a problem if we have a fence around the scene - any point inside will
+        # return true
         if len(points) > 1:
             x_min = points[:, 0].min()
             y_min = points[:, 1].min()

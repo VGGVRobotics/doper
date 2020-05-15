@@ -1,14 +1,12 @@
-import time
 import numpy as np
-import taichi as ti
-from matplotlib import pyplot as plt
 from doper.world.assets import get_svg_scene
 from doper.world.visualizer import TaichiRenderer
 from doper.world.observations import UndirectedRangeSensor
 
+
 if __name__ == "__main__":
     scene = get_svg_scene("../assets/simple_level.svg", px_per_meter=50)
-    gui = TaichiRenderer(scene=scene, px_per_meter=50, window_size_meters=(10, 7))
+    gui = TaichiRenderer(scene=scene, px_per_meter=50, window_size_meters=(12, 9))
     sensor = UndirectedRangeSensor(distance_range=3.5, angle_step=1)
     sensor_pos = np.array((1.0, 1.0))
     while True:

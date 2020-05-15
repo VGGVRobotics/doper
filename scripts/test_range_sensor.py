@@ -1,7 +1,7 @@
 import time
 import numpy as np
 from matplotlib import pyplot as plt
-from doper.world import Scene, Rasterizer, Polygon, UndirectedRangeSensor
+from doper.world import Scene, Polygon, UndirectedRangeSensor
 
 
 if __name__ == "__main__":
