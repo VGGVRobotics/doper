@@ -6,15 +6,16 @@ The presence of rolling friction is also assumed
 
 import taichi as ti
 import numpy as np
+import matplotlib.pyplot as plt
 
 
-ti.init(arch=ti.cuda, default_fp=ti.f32)
-gui = ti.GUI("ball", (1024, 1024))
+ti.init(arch=ti.cpu, default_fp=ti.f32)
+gui = ti.GUI("ball", (256, 256))
 
 constants = {
     "radius": 0.05,
     "g": 9.8,
-    "f": 0.001,
+    "f": 0.007,
     "ro": 1000,
 }
 constants["volume"] = 4 * np.pi * (constants["radius"] ** 3) / 3
@@ -80,10 +81,10 @@ def compute_rolling_friction_force(t,):
     normal_force = mass * g
 
     velocity_direction[None] = v[t - 1, 0]
-    if velocity_direction[None][0] != 0:
+    if velocity_direction[None][0] != 0.:
         velocity_direction[None][0] /= ti.abs(velocity_direction[None][0])
 
-    if velocity_direction[None][1] != 0:
+    if velocity_direction[None][1] != 0.:
         velocity_direction[None][1] /= ti.abs(velocity_direction[None][1])
 
     return - velocity_direction * f * normal_force / radius
@@ -101,16 +102,26 @@ def sim_step(t: ti.i32,):
     """
     l2_force = cumpute_l2_force()
     friction_force = compute_rolling_friction_force(t,)
-
     acceleration[t, 0] = (world_scale_coeff * l2_force + friction_force) / mass
 
     v[t, 0] = v[t - 1, 0] + acceleration[t, 0] * dt
     coordinate[t, 0] = coordinate[t - 1, 0] + v[t, 0] * dt
 
 
+def draw_potentials():
+    pot_np = potential_grid.to_numpy().reshape(grid_w, grid_h) * world_scale_coeff
+    pot_np = pot_np + np.abs(pot_np.min())
+    plt.imsave('potential.jpg', pot_np / pot_np.max())
+    pot_grad_np = potential_gradient_grid.to_numpy().reshape(grid_w, grid_h, 2) * world_scale_coeff
+    pot_grad_np = pot_grad_np + np.abs(pot_grad_np.min())
+    plt.imsave('potential_g0.jpg', pot_grad_np[:, :, 0] / pot_grad_np.max())
+    plt.imsave('potential_g1.jpg', pot_grad_np[:, :, 1] / pot_grad_np.max())
+
+
 def run_simulation():
     compute_potential_grid()
     compute_potential_grad_field()
+    draw_potentials()
     for t in range(1, sim_steps):
         find_cell(t - 1)
         sim_step(t)
@@ -118,7 +129,9 @@ def run_simulation():
 
         gui.circle(target_coordinate[None], radius=5, color=0x00000)
 
-        gui.circle(coordinate[t, 0], radius=10, color=0xF20530)
+        gui.circle(coordinate[t, 0],
+                   radius=int(constants["radius"] * world_scale_coeff * 10),
+                   color=0xF20530)
 
         gui.show()
 
@@ -138,10 +151,10 @@ def place():
 
 
 if __name__ == "__main__":
-    sim_steps = 4000
-    max_time = 50
+    sim_steps = 20000
+    max_time = 40
     world_scale_coeff = 10
-    grid_w, grid_h = (128, 128)
+    grid_w, grid_h = (1024, 1024)
     x_borders = (0, 1)
     y_borders = (0, 1)
 
@@ -181,9 +194,9 @@ if __name__ == "__main__":
     volume[None] = constants["volume"]
     mass[None] = constants["mass"]
 
-    coordinate[0, 0] = [0.2, 0.6]
+    coordinate[0, 0] = [0.2, 0.5]
     target_coordinate[None] = [0.5, 0.5]
-    v[0, 0] = [-0.3, 0.5]
+    v[0, 0] = [0.0, 1.]
     acceleration[0, 0] = [0.0, 0.0]
     dt[None] = max_time / sim_steps
     run_simulation()
