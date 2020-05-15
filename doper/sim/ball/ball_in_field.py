@@ -8,26 +8,17 @@ import taichi as ti
 import numpy as np
 
 
-ti.init(arch=ti.cpu, default_fp=ti.f32)
+ti.init(arch=ti.cuda, default_fp=ti.f32)
 gui = ti.GUI("ball", (1024, 1024))
 
 constants = {
-    "radius": 0.1,
+    "radius": 0.05,
     "g": 9.8,
     "f": 0.001,
     "ro": 1000,
 }
 constants["volume"] = 4 * np.pi * (constants["radius"] ** 3) / 3
 constants["mass"] = constants["volume"] * constants["ro"]
-
-
-# @ti.func
-def mean(var):
-    ret = 0
-    for i in range(var.n):
-        print(i)
-        ret += var[i, 0]
-    return ret / var.n
 
 
 @ti.func
@@ -40,7 +31,7 @@ def compute_potential_point(coord):
 def compute_potential_grid():
     for i in range(grid_w):
         for j in range(grid_h):
-            potential_grid[i, j][0] = world_scale_coeff * compute_potential_point(coords_grid[i, j])
+            potential_grid[i, j][0] = compute_potential_point(coords_grid[i, j])
 
 
 @ti.kernel
@@ -48,8 +39,6 @@ def compute_potential_grad_field():
     # https://numpy.org/doc/stable/reference/generated/numpy.gradient.html?highlight=gradient#numpy.gradient
     for i in range(1, grid_w - 1):
         for j in range(1, grid_h - 1):
-            hx = coords_grid[i, j][1] - coords_grid[i - 1, j][1]
-            hy = coords_grid[i, j][0] - coords_grid[i, j - 1][0]
             potential_gradient_grid[i, j][0] = (
                 potential_grid[i + 1, j][0] - potential_grid[i - 1, j][0]
             ) / (2 * hx)
@@ -60,15 +49,8 @@ def compute_potential_grad_field():
 
 @ti.kernel
 def find_cell(t: ti.i32,):
-    # TODO find some other way to find the cell id by coordinate
-    diff = 1e5
-    for i in range(grid_w):
-        for j in range(grid_h):
-            diff_with_cell = coordinate[t, 0] - coords_grid[i, j]
-            if diff_with_cell[0] + diff_with_cell[1] < diff:
-                diff = diff_with_cell[0] + diff_with_cell[1]
-                idx[None][0] = i
-                idx[None][1] = j
+    idx[None][0] = coordinate[t, 0][0] // hx
+    idx[None][1] = coordinate[t, 0][1] // hy
 
 
 @ti.func
@@ -81,10 +63,8 @@ def cumpute_l2_force():
     Returns:
         float: the amount of force produced by L2 potential
     """
-    # TODO: compute force only by sampling the potential and calculating the derivative
-    print(idx[None][0])
-    print(idx[None][1])
-    return potential_gradient_grid[idx[None][0], idx[None][1]]
+
+    return -potential_gradient_grid[idx[None][0], idx[None][1]]
 
 
 @ti.func
@@ -100,10 +80,13 @@ def compute_rolling_friction_force(t,):
     normal_force = mass * g
 
     velocity_direction[None] = v[t - 1, 0]
-    velocity_direction[None][0] /= ti.abs(velocity_direction[None][0])
-    velocity_direction[None][1] /= ti.abs(velocity_direction[None][1])
+    if velocity_direction[None][0] != 0:
+        velocity_direction[None][0] /= ti.abs(velocity_direction[None][0])
 
-    return -velocity_direction * f * normal_force / radius
+    if velocity_direction[None][1] != 0:
+        velocity_direction[None][1] /= ti.abs(velocity_direction[None][1])
+
+    return - velocity_direction * f * normal_force / radius
 
 
 @ti.kernel
@@ -118,8 +101,7 @@ def sim_step(t: ti.i32,):
     """
     l2_force = cumpute_l2_force()
     friction_force = compute_rolling_friction_force(t,)
-    print(l2_force[0])
-    print(friction_force[0])
+
     acceleration[t, 0] = (world_scale_coeff * l2_force + friction_force) / mass
 
     v[t, 0] = v[t - 1, 0] + acceleration[t, 0] * dt
@@ -129,9 +111,6 @@ def sim_step(t: ti.i32,):
 def run_simulation():
     compute_potential_grid()
     compute_potential_grad_field()
-    print(potential_gradient_grid[100, 100][0])
-    print(potential_grid[99, 99][0])
-    print(potential_grid[101, 101][0])
     for t in range(1, sim_steps):
         find_cell(t - 1)
         sim_step(t)
@@ -153,7 +132,7 @@ def place():
         potential_gradient_grid, potential_grid, coords_grid
     )
     ti.root.place(target_coordinate, velocity_direction, idx)
-    ti.root.place(dt, radius, g, f, ro, volume, mass)
+    ti.root.place(dt, radius, g, f, ro, volume, mass, hx, hy)
     ti.root.place(potential)
     ti.root.lazy_grad()
 
@@ -185,11 +164,15 @@ if __name__ == "__main__":
     volume = ti.var(dt=ti.f32)
     mass = ti.var(dt=ti.f32)
     potential = ti.var(dt=ti.f32)
+    hx = ti.var(dt=ti.f32)
+    hy = ti.var(dt=ti.f32)
 
     x_c = np.linspace(*x_borders, grid_w)
     y_c = np.linspace(*y_borders, grid_h)
     grid = np.stack(np.meshgrid(x_c, y_c, indexing="xy"), 2)
     coords_grid.from_numpy(grid)
+    hx[None] = np.abs(x_c[1] - x_c[0])
+    hy[None] = np.abs(y_c[1] - y_c[0])
 
     radius[None] = constants["radius"]
     g[None] = constants["g"]
@@ -200,7 +183,7 @@ if __name__ == "__main__":
 
     coordinate[0, 0] = [0.2, 0.6]
     target_coordinate[None] = [0.5, 0.5]
-    v[0, 0] = [0.1, 0.]
+    v[0, 0] = [-0.3, 0.5]
     acceleration[0, 0] = [0.0, 0.0]
     dt[None] = max_time / sim_steps
     run_simulation()
