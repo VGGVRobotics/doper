@@ -4,6 +4,7 @@ is being produced only by L2 distance between current agents location and target
 The presence of rolling friction is also assumed
 """
 from typing import List, Dict, Tuple, Union
+import os
 
 import numpy as np
 import taichi as ti
@@ -13,13 +14,18 @@ import matplotlib.pyplot as plt
 @ti.data_oriented
 class BaseSim:
     def __init__(self,
-                grid_resolution: Tuple[int]):
+                grid_resolution: Tuple[int],
+                output_folder: os.PathLike):
         """Base simulation class. Capable of creating grid of potential and its gradient
         Gradient computation is numerical
 
         Args:
             grid_resolution (Tuple[int]): Width and height resolution for potential and gradient
+            output_folder (os.PathLike): Output folder
         """
+        self.output_folder = output_folder
+        os.makedirs(output_folder, exist_ok=True)
+
         self.potential_gradient_grid = ti.Vector(2, dt=ti.f32)
         self.potential_grid = ti.Vector(1, dt=ti.f32)
         self.coords_grid = ti.Vector(2, dt=ti.f32)
@@ -95,11 +101,11 @@ class BaseSim:
         """
         pot_np = self.potential_grid.to_numpy().reshape(self.grid_w, self.grid_h)
         pot_np = pot_np + np.abs(pot_np.min())
-        plt.imsave('potential.jpg', pot_np / pot_np.max())
+        plt.imsave(os.path.join(self.output_folder, 'potential.jpg'), pot_np / pot_np.max())
         pot_grad_np = self.potential_gradient_grid.to_numpy().reshape(self.grid_w, self.grid_h, 2)
         pot_grad_np = pot_grad_np + np.abs(pot_grad_np.min())
-        plt.imsave('potential_g0.jpg', pot_grad_np[:, :, 0] / pot_grad_np.max())
-        plt.imsave('potential_g1.jpg', pot_grad_np[:, :, 1] / pot_grad_np.max())
+        plt.imsave(os.path.join(self.output_folder, 'potential_g0.jpg'), pot_grad_np[:, :, 0] / pot_grad_np.max())
+        plt.imsave(os.path.join(self.output_folder, 'potential_g1.jpg'), pot_grad_np[:, :, 1] / pot_grad_np.max())
 
 
     def run_simulation(self,):

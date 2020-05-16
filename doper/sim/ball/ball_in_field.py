@@ -1,4 +1,5 @@
 from typing import List, Dict, Tuple, Union
+import os
 
 import numpy as np
 import taichi as ti
@@ -15,7 +16,9 @@ class RollingBallSim(BaseSim):
                  max_time: int,
                  world_scale_coeff: Union[int, float],
                  grid_resolution: Tuple[int],
-                 gui):
+                 gui,
+                 output_folder: os.PathLike = './output',
+                 ):
         """Simultaion of the ball in the potential field.
         All the equations below assumes that the agent is a ball with radius R, and the potential force
         is being produced only by L2 distance between current agents location and target point.
@@ -29,8 +32,9 @@ class RollingBallSim(BaseSim):
             world_scale_coeff (Union[int, float]): the taichi gui supports only [0, 1], so this is used to 'scale' the world
             grid_resolution (Tuple[int]): number of cells accross each axis
             gui (ti.gui): taichi gui
+            output_folder (os.PathLike): Output folder, used for visualisation
         """
-        super().__init__(grid_resolution)
+        super().__init__(grid_resolution, output_folder)
         self.sim_steps = sim_steps
         self.max_time = max_time
         self.gui = gui
