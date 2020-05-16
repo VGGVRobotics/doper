@@ -149,18 +149,18 @@ class RollingBallSim(BaseSim):
 
     def run_simulation(
         self,
-        initial_coordinate: Union[Tuple, Union[List[float], np.float32]],
-        attraction_coordinate: Union[Tuple, Union[List[float], np.float32]],
-        initial_speed: Union[Tuple, Union[List[float], np.float32]],
+        initial_coordinate: Tuple[float, float],
+        attraction_coordinate: Tuple[float, float],
+        initial_speed: Tuple[float, float],
     ):
         """[summary]
 
         Args:
-            initial_coordinate (Union[Tuple, Union[List[float], np.float32]]):
+            initial_coordinate (Tuple[float, float]):
                 [x, y] starting point for the ball
-            attraction_coordinate (Union[Tuple, Union[List[float], np.float32]]):
+            attraction_coordinate (Tuple[float, float]):
                 [x, y] target point, L2 is being computed with it
-            initial_speed (Union[Tuple, Union[List[float], np.float32]]):
+            initial_speed (Tuple[float, float]):
                 [vx, vy] initial speed of the ball
         """
         self.coordinate[0, 0] = initial_coordinate
