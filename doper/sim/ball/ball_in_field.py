@@ -18,7 +18,7 @@ class RollingBallSim(BaseSim):
         world_scale_coeff: Union[int, float],
         grid_resolution: Tuple[int],
         gui,
-        output_folder: os.PathLike = "./output",
+        output_folder: os.PathLike,
     ):
         """Simultaion of the ball in the potential field.
         All the equations below assumes that the agent is a ball with radius R, and the potential force
