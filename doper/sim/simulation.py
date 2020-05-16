@@ -19,13 +19,14 @@ if __name__ == "__main__":
     constants["volume"] = 4 * np.pi * (constants["radius"] ** 3) / 3
     constants["mass"] = constants["volume"] * constants["ro"]
 
-    sim = RollingBallSim(constants=constants,
-                         sim_steps=20000,
-                         max_time=40,
-                         world_scale_coeff=10,
-                         grid_resolution=(128, 128),
-                         gui=gui)
-    sim.run_simulation(initial_coordinate=[0.2, 0.5],
-                       attraction_coordinate=[0.5, 0.5],
-                       initial_speed=[0., 1.])
-
+    sim = RollingBallSim(
+        constants=constants,
+        sim_steps=20000,
+        max_time=40,
+        world_scale_coeff=10,
+        grid_resolution=(128, 128),
+        gui=gui,
+    )
+    sim.run_simulation(
+        initial_coordinate=[0.2, 0.5], attraction_coordinate=[0.5, 0.5], initial_speed=[0.0, 1.0]
+    )

@@ -13,9 +13,7 @@ import matplotlib.pyplot as plt
 
 @ti.data_oriented
 class BaseSim:
-    def __init__(self,
-                grid_resolution: Tuple[int],
-                output_folder: os.PathLike):
+    def __init__(self, grid_resolution: Tuple[int], output_folder: os.PathLike):
         """Base simulation class. Capable of creating grid of potential and its gradient
         Gradient computation is numerical
 
@@ -42,13 +40,11 @@ class BaseSim:
 
         self.grid_w, self.grid_h = grid_resolution
 
-
     @ti.func
     def compute_potential_point(self):
         """Function should compute potential value given the coorditane
         """
         raise NotImplementedError
-
 
     @ti.kernel
     def compute_potential_grid(self,):
@@ -57,7 +53,6 @@ class BaseSim:
         for i in range(self.grid_w):
             for j in range(self.grid_h):
                 self.potential_grid[i, j][0] = self.compute_potential_point(self.coords_grid[i, j])
-
 
     @ti.kernel
     def compute_potential_grad_grid(self):
@@ -73,9 +68,10 @@ class BaseSim:
                     self.potential_grid[i, j + 1][0] - self.potential_grid[i, j - 1][0]
                 ) / (2 * self.hy)
 
-
     @ti.kernel
-    def find_cell(self, t: ti.i32,):
+    def find_cell(
+        self, t: ti.i32,
+    ):
         """Stores the id of the cell the agent is in in the time id t
 
         Args:
@@ -84,9 +80,10 @@ class BaseSim:
         self.idx[None][0] = self.coordinate[t, 0][0] // self.hx
         self.idx[None][1] = self.coordinate[t, 0][1] // self.hy
 
-
     @ti.kernel
-    def sim_step(self, t: ti.i32,):
+    def sim_step(
+        self, t: ti.i32,
+    ):
         """Makes one step of the simulation
 
         Args:
@@ -95,18 +92,22 @@ class BaseSim:
         """
         raise NotImplementedError
 
-
     def draw_potentials(self):
         """Saves images of the potential and x and y derivatives
         """
         pot_np = self.potential_grid.to_numpy().reshape(self.grid_w, self.grid_h)
         pot_np = pot_np + np.abs(pot_np.min())
-        plt.imsave(os.path.join(self.output_folder, 'potential.jpg'), pot_np / pot_np.max())
+        plt.imsave(os.path.join(self.output_folder, "potential.jpg"), pot_np / pot_np.max())
         pot_grad_np = self.potential_gradient_grid.to_numpy().reshape(self.grid_w, self.grid_h, 2)
         pot_grad_np = pot_grad_np + np.abs(pot_grad_np.min())
-        plt.imsave(os.path.join(self.output_folder, 'potential_g0.jpg'), pot_grad_np[:, :, 0] / pot_grad_np.max())
-        plt.imsave(os.path.join(self.output_folder, 'potential_g1.jpg'), pot_grad_np[:, :, 1] / pot_grad_np.max())
-
+        plt.imsave(
+            os.path.join(self.output_folder, "potential_g0.jpg"),
+            pot_grad_np[:, :, 0] / pot_grad_np.max(),
+        )
+        plt.imsave(
+            os.path.join(self.output_folder, "potential_g1.jpg"),
+            pot_grad_np[:, :, 1] / pot_grad_np.max(),
+        )
 
     def run_simulation(self,):
         """Function used to run the simulation

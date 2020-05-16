@@ -1,0 +1,5 @@
+taichi==0.6.2
+pytorch==1.4.0
+numpy==1.18.1
+svgpathtools
+matplotlib
