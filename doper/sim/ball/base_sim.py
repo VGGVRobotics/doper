@@ -1,8 +1,3 @@
-"""
-All the equations below assumes that the agent is a ball with radius R, and the potential force
-is being produced only by L2 distance between current agents location and target point.
-The presence of rolling friction is also assumed
-"""
 from typing import List, Dict, Tuple, Union
 import os
 
