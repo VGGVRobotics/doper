@@ -153,7 +153,7 @@ class RollingBallSim(BaseSim):
         attraction_coordinate: Tuple[float, float],
         initial_speed: Tuple[float, float],
     ):
-        """[summary]
+        """Runs simulation
 
         Args:
             initial_coordinate (Tuple[float, float]):
