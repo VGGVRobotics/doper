@@ -42,7 +42,7 @@ class BaseSim:
         raise NotImplementedError
 
     @ti.kernel
-    def compute_potential_grid(self,):
+    def compute_potential_grid(self):
         """Kernel iterates though all the cells in the grid, stores the potential value
         """
         for i in range(self.grid_w):
@@ -104,7 +104,7 @@ class BaseSim:
             pot_grad_np[:, :, 1] / pot_grad_np.max(),
         )
 
-    def run_simulation(self,):
+    def run_simulation(self):
         """Function used to run the simulation
         """
         raise NotImplementedError

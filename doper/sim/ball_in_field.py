@@ -17,7 +17,7 @@ class RollingBallSim(BaseSim):
         max_time: int,
         world_scale_coeff: Union[int, float],
         grid_resolution: Tuple[int],
-        gui,
+        gui: ti.misc.gui.GUI,
         output_folder: os.PathLike,
     ):
         """Simultaion of the ball in the potential field.
@@ -85,7 +85,7 @@ class RollingBallSim(BaseSim):
         self.dt[None] = self.max_time / self.sim_steps
 
     @ti.func
-    def compute_potential_point(self, coord):
+    def compute_potential_point(self, coord: ti.f32):
         """Computes the potential, defined as L2 distance between
         the current coordinate and target poing
 
@@ -110,7 +110,7 @@ class RollingBallSim(BaseSim):
 
     @ti.func
     def compute_rolling_friction_force(
-        self, t,
+        self, t: ti.f32,
     ):
         """Computes rolling friction force value, flat land assumed
 
