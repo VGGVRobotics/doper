@@ -1,8 +1,3 @@
-"""
-All the equations below assumes that the agent is a ball with radius R, and the potential force
-is being produced only by L2 distance between current agents location and target point.
-The presence of rolling friction is also assumed
-"""
 from typing import List, Dict, Tuple, Union
 
 import numpy as np
@@ -21,6 +16,20 @@ class RollingBallSim(BaseSim):
                  world_scale_coeff: Union[int, float],
                  grid_resolution: Tuple[int],
                  gui):
+        """Simultaion of the ball in the potential field.
+        All the equations below assumes that the agent is a ball with radius R, and the potential force
+        is being produced only by L2 distance between current agents location and target point.
+        The presence of rolling friction is also assumed
+
+
+        Args:
+            constants (Dict[str, Union[Union[float, int], str]]): dict with basic physical constants
+            sim_steps (int): total number of steps in the simulation
+            max_time (int): the length of the simulation, seconds
+            world_scale_coeff (Union[int, float]): the taichi gui supports only [0, 1], so this is used to 'scale' the world
+            grid_resolution (Tuple[int]): number of cells accross each axis
+            gui (ti.gui): taichi gui
+        """
         super().__init__(grid_resolution)
         self.sim_steps = sim_steps
         self.max_time = max_time
@@ -70,6 +79,15 @@ class RollingBallSim(BaseSim):
 
     @ti.func
     def compute_potential_point(self, coord):
+        """Computes the potential, defined as L2 distance between
+        the current coordinate and target poing
+
+        Args:
+            coord (ti.f32): current coordinate
+
+        Returns:
+            ti.f32: value of the potential
+        """
         potential_local = ti.sqr((self.target_coordinate - coord))
         return potential_local[0] + potential_local[1]
 
@@ -78,11 +96,8 @@ class RollingBallSim(BaseSim):
     def compute_l2_force(self):
         """Computes force produced by L2 potential
 
-        Args:
-            t (int): time id
-
         Returns:
-            float: the amount of force produced by L2 potential
+            ti.f32: the amount of force produced by L2 potential
         """
 
         return - self.potential_gradient_grid[self.idx[None][0], self.idx[None][1]]
@@ -93,10 +108,10 @@ class RollingBallSim(BaseSim):
         """Computes rolling friction force value, flat land assumed
 
         Args:
-            t (int): time id
+            t (ti.i32): time id
 
         Returns:
-            float: the amount of the rolling friction force
+            flti.f32oat: the amount of the rolling friction force
         """
         normal_force = self.mass * self.g
 
@@ -115,10 +130,7 @@ class RollingBallSim(BaseSim):
         """Makes one step of the simulation
 
         Args:
-            t (int): time id
-
-        Returns:
-            list: [description]
+            t (ti.i32): time id
         """
         l2_force = self.compute_l2_force()
         friction_force = self.compute_rolling_friction_force(t,)
@@ -129,9 +141,19 @@ class RollingBallSim(BaseSim):
 
 
     def run_simulation(self,
-                       initial_coordinate: Union[List[float], np.float32],
-                       attraction_coordinate: List[float],
-                       initial_speed: List[float]):
+                       initial_coordinate: Union[Tuple, Union[List[float], np.float32]],
+                       attraction_coordinate: Union[Tuple, Union[List[float], np.float32]],
+                       initial_speed: Union[Tuple, Union[List[float], np.float32]]):
+        """[summary]
+
+        Args:
+            initial_coordinate (Union[Tuple, Union[List[float], np.float32]]):
+                [x, y] starting point for the ball
+            attraction_coordinate (Union[Tuple, Union[List[float], np.float32]]):
+                [x, y] target point, L2 is being computed with it
+            initial_speed (Union[Tuple, Union[List[float], np.float32]]):
+                [vx, vy] initial speed of the ball
+        """
         self.coordinate[0, 0] = initial_coordinate
         self.target_coordinate[None] = attraction_coordinate
         self.v[0, 0] = initial_speed
