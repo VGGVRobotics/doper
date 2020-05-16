@@ -9,9 +9,11 @@ import numpy as np
 import taichi as ti
 import matplotlib.pyplot as plt
 
+from .base_sim import BaseSim
+
 
 @ti.data_oriented
-class RollingBallSim:
+class RollingBallSim(BaseSim):
     def __init__(self,
                  constants: Dict[str, Union[Union[float, int], str]],
                  sim_steps: int,
@@ -19,6 +21,7 @@ class RollingBallSim:
                  world_scale_coeff: Union[int, float],
                  grid_resolution: Tuple[int],
                  gui):
+        super().__init__(grid_resolution)
         self.sim_steps = sim_steps
         self.max_time = max_time
         self.gui = gui
@@ -28,17 +31,6 @@ class RollingBallSim:
         x_borders = (0, 1)
         y_borders = (0, 1)
 
-        self.potential_gradient_grid = ti.Vector(2, dt=ti.f32)
-        self.potential_grid = ti.Vector(1, dt=ti.f32)
-        self.coords_grid = ti.Vector(2, dt=ti.f32)
-
-        self.target_coordinate = ti.Vector(2, dt=ti.f32)
-        self.velocity_direction = ti.Vector(2, dt=ti.f32)
-        self.coordinate = ti.Vector(2, dt=ti.f32)
-        self.v = ti.Vector(2, dt=ti.f32)
-        self.acceleration = ti.Vector(2, dt=ti.f32)
-        self.idx = ti.Vector(2, dt=ti.i32)
-
         self.dt = ti.var(dt=ti.f32)
         self.radius = ti.var(dt=ti.f32)
         self.g = ti.var(dt=ti.f32)
@@ -47,8 +39,6 @@ class RollingBallSim:
         self.volume = ti.var(dt=ti.f32)
         self.mass = ti.var(dt=ti.f32)
         self.potential = ti.var(dt=ti.f32)
-        self.hx = ti.var(dt=ti.f32)
-        self.hy = ti.var(dt=ti.f32)
 
         ti.root.dense(ti.l, self.sim_steps).dense(ti.i, 1).place(self.coordinate,
                                                                  self.v,
@@ -82,32 +72,6 @@ class RollingBallSim:
     def compute_potential_point(self, coord):
         potential_local = ti.sqr((self.target_coordinate - coord))
         return potential_local[0] + potential_local[1]
-
-
-    @ti.kernel
-    def compute_potential_grid(self,):
-        for i in range(self.grid_w):
-            for j in range(self.grid_h):
-                self.potential_grid[i, j][0] = self.compute_potential_point(self.coords_grid[i, j])
-
-
-    @ti.kernel
-    def compute_potential_grad_field(self):
-        # https://numpy.org/doc/stable/reference/generated/numpy.gradient.html?highlight=gradient#numpy.gradient
-        for i in range(1, self.grid_w - 1):
-            for j in range(1, self.grid_h - 1):
-                self.potential_gradient_grid[i, j][0] = (
-                    self.potential_grid[i + 1, j][0] - self.potential_grid[i - 1, j][0]
-                ) / (2 * self.hx)
-                self.potential_gradient_grid[i, j][1] = (
-                    self.potential_grid[i, j + 1][0] - self.potential_grid[i, j - 1][0]
-                ) / (2 * self.hy)
-
-
-    @ti.kernel
-    def find_cell(self, t: ti.i32,):
-        self.idx[None][0] = self.coordinate[t, 0][0] // self.hx
-        self.idx[None][1] = self.coordinate[t, 0][1] // self.hy
 
 
     @ti.func
@@ -164,16 +128,6 @@ class RollingBallSim:
         self.coordinate[t, 0] = self.coordinate[t - 1, 0] + self.v[t, 0] * self.dt
 
 
-    def draw_potentials(self):
-        pot_np = self.potential_grid.to_numpy().reshape(self.grid_w, self.grid_h)
-        pot_np = pot_np + np.abs(pot_np.min())
-        plt.imsave('potential.jpg', pot_np / pot_np.max())
-        pot_grad_np = self.potential_gradient_grid.to_numpy().reshape(self.grid_w, self.grid_h, 2)
-        pot_grad_np = pot_grad_np + np.abs(pot_grad_np.min())
-        plt.imsave('potential_g0.jpg', pot_grad_np[:, :, 0] / pot_grad_np.max())
-        plt.imsave('potential_g1.jpg', pot_grad_np[:, :, 1] / pot_grad_np.max())
-
-
     def run_simulation(self,
                        initial_coordinate: Union[List[float], np.float32],
                        attraction_coordinate: List[float],
@@ -183,7 +137,7 @@ class RollingBallSim:
         self.v[0, 0] = initial_speed
         self.acceleration[0, 0] = [0.0, 0.0]
         self.compute_potential_grid()
-        self.compute_potential_grad_field()
+        self.compute_potential_grad_grid()
         self.draw_potentials()
         for t in range(1, self.sim_steps):
             self.find_cell(t - 1)
