@@ -24,10 +24,10 @@ if __name__ == "__main__":
         sim_steps=20000,
         max_time=40,
         world_scale_coeff=10,
-        grid_resolution=(128, 128),
+        grid_resolution=(1024, 1024),
         gui=gui,
         output_folder='./output'
     )
     sim.run_simulation(
-        initial_coordinate=[0.2, 0.5], attraction_coordinate=[0.5, 0.5], initial_speed=[0.0, 1.0]
+        initial_coordinate=[0.2, 0.5], attraction_coordinate=[0.5, 0.5], initial_speed=[0.0, -5.0], visualize=True
     )

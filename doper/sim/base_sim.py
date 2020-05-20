@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple, Union
+from typing import Tuple
 import os
 
 import numpy as np
@@ -22,6 +22,7 @@ class BaseSim:
         self.potential_gradient_grid = ti.Vector(2, dt=ti.f32)
         self.potential_grid = ti.Vector(1, dt=ti.f32)
         self.coords_grid = ti.Vector(2, dt=ti.f32)
+        self.obstacle_grid = ti.Vector(1, dt=ti.i32)
 
         self.target_coordinate = ti.Vector(2, dt=ti.f32)
         self.velocity_direction = ti.Vector(2, dt=ti.f32)
@@ -30,10 +31,15 @@ class BaseSim:
         self.acceleration = ti.Vector(2, dt=ti.f32)
         self.idx = ti.Vector(2, dt=ti.i32)
 
+
         self.hx = ti.var(dt=ti.f32)
         self.hy = ti.var(dt=ti.f32)
 
         self.grid_w, self.grid_h = grid_resolution
+
+        ti.root.dense(ti.j, self.grid_w).dense(ti.k, self.grid_h).place(
+            self.potential_gradient_grid, self.potential_grid, self.coords_grid, self.obstacle_grid
+        )
 
     @ti.func
     def compute_potential_point(self):
@@ -76,6 +82,13 @@ class BaseSim:
         self.idx[None][1] = self.coordinate[t, 0][1] // self.hy
 
     @ti.kernel
+    def compute_obstacle_grid(self):
+        for i in range(self.grid_w):
+            for j in range(self.grid_h):
+                if (i == 0) | (j == 0) | (i == 1) | (j == 1):
+                    self.obstacle_grid[i, j][0] = 1
+
+    @ti.kernel
     def sim_step(
         self, t: ti.i32,
     ):
@@ -102,6 +115,11 @@ class BaseSim:
         plt.imsave(
             os.path.join(self.output_folder, "potential_g1.jpg"),
             pot_grad_np[:, :, 1] / pot_grad_np.max(),
+        )
+
+        plt.imsave(
+            os.path.join(self.output_folder, "obstacles.jpg"),
+            self.obstacle_grid.to_numpy().reshape(self.grid_w, self.grid_h),
         )
 
     def run_simulation(self):

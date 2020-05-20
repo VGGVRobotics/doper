@@ -1,5 +1,6 @@
 from typing import List, Dict, Tuple, Union
 import os
+from time import time
 
 import numpy as np
 import taichi as ti
@@ -12,7 +13,7 @@ from .base_sim import BaseSim
 class RollingBallSim(BaseSim):
     def __init__(
         self,
-        constants: Dict[str, Union[Union[float, int], str]],
+        constants: Dict[str, Union[float, int, str]],
         sim_steps: int,
         max_time: int,
         world_scale_coeff: Union[int, float],
@@ -46,6 +47,9 @@ class RollingBallSim(BaseSim):
         x_borders = (0, 1)
         y_borders = (0, 1)
 
+        self.imp = ti.Vector(2, dt=ti.f32)
+        self.x_inc_contrib = ti.Vector(2, dt=ti.f32)
+
         self.dt = ti.var(dt=ti.f32)
         self.radius = ti.var(dt=ti.f32)
         self.g = ti.var(dt=ti.f32)
@@ -54,16 +58,14 @@ class RollingBallSim(BaseSim):
         self.volume = ti.var(dt=ti.f32)
         self.mass = ti.var(dt=ti.f32)
         self.potential = ti.var(dt=ti.f32)
+        self.elasticity = ti.var(dt=ti.f32)
 
         ti.root.dense(ti.l, self.sim_steps).dense(ti.i, 1).place(
             self.coordinate, self.v, self.acceleration
         )
-        ti.root.dense(ti.j, self.grid_w).dense(ti.k, self.grid_h).place(
-            self.potential_gradient_grid, self.potential_grid, self.coords_grid
-        )
-        ti.root.place(self.target_coordinate, self.velocity_direction, self.idx)
+        ti.root.place(self.target_coordinate, self.velocity_direction, self.idx, self.imp, self.x_inc_contrib)
         ti.root.place(
-            self.dt, self.radius, self.g, self.f, self.ro, self.volume, self.mass, self.hx, self.hy
+            self.dt, self.radius, self.g, self.f, self.ro, self.volume, self.mass, self.hx, self.hy, self.elasticity
         )
         ti.root.place(self.potential)
         ti.root.lazy_grad()
@@ -84,6 +86,11 @@ class RollingBallSim(BaseSim):
 
         self.dt[None] = self.max_time / self.sim_steps
 
+        self.elasticity[None] = 0.8
+        self.imp[None] = [0.0, 0.0]
+        self.x_inc_contrib[None] = [0.0, 0.0]
+
+
     @ti.func
     def compute_potential_point(self, coord: ti.f32):
         """Computes the potential, defined as L2 distance between
@@ -97,6 +104,26 @@ class RollingBallSim(BaseSim):
         """
         potential_local = ti.sqr((self.target_coordinate - coord))
         return potential_local[0] + potential_local[1]
+
+    @ti.func
+    def set_collision_impact(
+        self, t: ti.i32, i: int, j: int,
+    ):
+        self.imp[None] = [0.0, 0.0]
+        self.x_inc_contrib[None] = [0.0, 0.0]
+        # TODO create a structure with obstacle cells coordinates, retrieve closest
+        if self.obstacle_grid[i, j][0] == 1:
+            dist = self.coordinate[t - 1, 0] + self.v[t - 1, 0] * self.dt - self.coords_grid[i, j]
+            dist_norm = dist.norm()
+            if dist_norm < 2 * self.radius:
+                direction = ti.Vector.normalized(dist)
+                projected_v = direction.dot(self.v[t - 1, 0])
+                if projected_v < 0:
+                    self.imp[None] = -(1 + self.elasticity) * 0.5 * projected_v * direction
+                    toi = (dist_norm - 2 * self.radius) / min(-1e-3, projected_v)
+                    print(toi - self.dt)
+                    self.x_inc_contrib[None] = min(toi - self.dt, 0) * self.imp
+                    print(self.x_inc_contrib[None][0])
 
     @ti.func
     def compute_l2_force(self):
@@ -140,18 +167,23 @@ class RollingBallSim(BaseSim):
         Args:
             t (ti.i32): time id
         """
+        for i in range(self.grid_w):
+            for j in range(self.grid_h):
+                self.set_collision_impact(t, i, j)
+
         l2_force = self.compute_l2_force()
         friction_force = self.compute_rolling_friction_force(t,)
-        self.acceleration[t, 0] = (self.world_scale_coeff * l2_force + friction_force) / self.mass
 
-        self.v[t, 0] = self.v[t - 1, 0] + self.acceleration[t, 0] * self.dt
-        self.coordinate[t, 0] = self.coordinate[t - 1, 0] + self.v[t, 0] * self.dt
+        self.acceleration[t, 0] = (self.world_scale_coeff * l2_force + friction_force) / self.mass
+        self.v[t, 0] = self.v[t - 1, 0] + self.acceleration[t, 0] * self.dt + self.imp
+        self.coordinate[t, 0] = self.coordinate[t - 1, 0] + self.v[t, 0] * self.dt + self.x_inc_contrib
 
     def run_simulation(
         self,
         initial_coordinate: Tuple[float, float],
         attraction_coordinate: Tuple[float, float],
         initial_speed: Tuple[float, float],
+        visualize: bool = True,
     ):
         """Runs simulation
 
@@ -162,27 +194,34 @@ class RollingBallSim(BaseSim):
                 [x, y] target point, L2 is being computed with it
             initial_speed (Tuple[float, float]):
                 [vx, vy] initial speed of the ball
+            visualize (bool): show GUI
         """
         self.coordinate[0, 0] = initial_coordinate
         self.target_coordinate[None] = attraction_coordinate
         self.v[0, 0] = initial_speed
         self.acceleration[0, 0] = [0.0, 0.0]
+        start = time()
         self.compute_potential_grid()
         self.compute_potential_grad_grid()
+        self.compute_obstacle_grid()
+        print(time() - start)
         self.draw_potentials()
         for t in range(1, self.sim_steps):
+            start = time()
             self.find_cell(t - 1)
             self.sim_step(t)
-            self.gui.clear(0x3C733F)
+            print(time() - start)
+            if visualize:
+                self.gui.clear(0x3C733F)
 
-            self.gui.circle(self.target_coordinate[None], radius=5, color=0x00000)
+                self.gui.circle(self.target_coordinate[None], radius=5, color=0x00000)
 
-            self.gui.circle(
-                self.coordinate[t, 0],
-                radius=int(self.constants["radius"] * self.world_scale_coeff * 10),
-                color=0xF20530,
-            )
+                self.gui.circle(
+                    self.coordinate[t, 0],
+                    radius=int(self.constants["radius"] * self.world_scale_coeff * 10),
+                    color=0xF20530,
+                )
 
-            self.gui.show()
+                self.gui.show()
 
             print(self.coordinate[t, 0][0], self.coordinate[t, 0][1])
