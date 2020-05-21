@@ -63,9 +63,20 @@ class RollingBallSim(BaseSim):
         ti.root.dense(ti.l, self.sim_steps).dense(ti.i, 1).place(
             self.coordinate, self.v, self.acceleration
         )
-        ti.root.place(self.target_coordinate, self.velocity_direction, self.idx, self.imp, self.x_inc_contrib)
         ti.root.place(
-            self.dt, self.radius, self.g, self.f, self.ro, self.volume, self.mass, self.hx, self.hy, self.elasticity
+            self.target_coordinate, self.velocity_direction, self.idx, self.imp, self.x_inc_contrib
+        )
+        ti.root.place(
+            self.dt,
+            self.radius,
+            self.g,
+            self.f,
+            self.ro,
+            self.volume,
+            self.mass,
+            self.hx,
+            self.hy,
+            self.elasticity,
         )
         ti.root.place(self.potential)
         ti.root.lazy_grad()
@@ -90,7 +101,6 @@ class RollingBallSim(BaseSim):
         self.imp[None] = [0.0, 0.0]
         self.x_inc_contrib[None] = [0.0, 0.0]
 
-
     @ti.func
     def compute_potential_point(self, coord: ti.f32):
         """Computes the potential, defined as L2 distance between
@@ -102,28 +112,17 @@ class RollingBallSim(BaseSim):
         Returns:
             ti.f32: value of the potential
         """
-        potential_local = ti.sqr((self.target_coordinate - coord))
+        potential_local = (self.target_coordinate - coord) ** 2
         return potential_local[0] + potential_local[1]
 
     @ti.func
-    def set_collision_impact(
+    def compute_obstacle_direction(
         self, t: ti.i32, i: int, j: int,
     ):
-        self.imp[None] = [0.0, 0.0]
-        self.x_inc_contrib[None] = [0.0, 0.0]
         # TODO create a structure with obstacle cells coordinates, retrieve closest
         if self.obstacle_grid[i, j][0] == 1:
-            dist = self.coordinate[t - 1, 0] + self.v[t - 1, 0] * self.dt - self.coords_grid[i, j]
-            dist_norm = dist.norm()
-            if dist_norm < 2 * self.radius:
-                direction = ti.Vector.normalized(dist)
-                projected_v = direction.dot(self.v[t - 1, 0])
-                if projected_v < 0:
-                    self.imp[None] = -(1 + self.elasticity) * 0.5 * projected_v * direction
-                    toi = (dist_norm - 2 * self.radius) / min(-1e-3, projected_v)
-                    print(toi - self.dt)
-                    self.x_inc_contrib[None] = min(toi - self.dt, 0) * self.imp
-                    print(self.x_inc_contrib[None][0])
+            obstacle_direction = self.coordinate[t - 1, 0] - self.coords_grid[i, j]
+            return obstacle_direction
 
     @ti.func
     def compute_l2_force(self):
@@ -167,16 +166,35 @@ class RollingBallSim(BaseSim):
         Args:
             t (ti.i32): time id
         """
+
+        min_dist_norm = 100000.0
+        closest_direction = ti.Vector([0.0, 0.0])
         for i in range(self.grid_w):
             for j in range(self.grid_h):
-                self.set_collision_impact(t, i, j)
+                obstacle_direction = self.compute_obstacle_direction(t, i, j)
+                dist_norm = obstacle_direction.norm()
+                if dist_norm < min_dist_norm:
+                    min_dist_norm = dist_norm
+                    closest_direction = obstacle_direction / dist_norm
+
+        if min_dist_norm < self.radius:
+            print(min_dist_norm)
+            projected_v_n = closest_direction.dot(self.v[t - 1, 0])
+            projected_v_p = self.v[t - 1, 0] - projected_v_n
+            print(projected_v_p[0])
+            print(projected_v_p[1])
+            self.v[t - 1, 0] = projected_v_p - self.elasticity * projected_v_n
+            print(self.v[t - 1, 0][0])
+            print(self.v[t - 1, 0][1])
 
         l2_force = self.compute_l2_force()
         friction_force = self.compute_rolling_friction_force(t,)
-
+        # collision_force = self.x_inc_contrib * self.dt
+        # print(collision_force[0])
+        # print(collision_force[1])
         self.acceleration[t, 0] = (self.world_scale_coeff * l2_force + friction_force) / self.mass
-        self.v[t, 0] = self.v[t - 1, 0] + self.acceleration[t, 0] * self.dt + self.imp
-        self.coordinate[t, 0] = self.coordinate[t - 1, 0] + self.v[t, 0] * self.dt + self.x_inc_contrib
+        self.v[t, 0] = self.v[t - 1, 0] + self.acceleration[t, 0] * self.dt
+        self.coordinate[t, 0] = self.coordinate[t - 1, 0] + self.v[t, 0] * self.dt
 
     def run_simulation(
         self,
