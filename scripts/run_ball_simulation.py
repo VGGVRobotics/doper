@@ -29,5 +29,5 @@ if __name__ == "__main__":
         output_folder='./output'
     )
     sim.run_simulation(
-        initial_coordinate=[0.3, 0.5], attraction_coordinate=[0.5, 0.5], initial_speed=[-1.0, 5.0], visualize=True
+        initial_coordinate=[0.2, 0.5], attraction_coordinate=[0.5, 0.5], initial_speed=[0.0, 7.0], visualize=True
     )

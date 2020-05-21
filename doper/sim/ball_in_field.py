@@ -174,21 +174,10 @@ class RollingBallSim(BaseSim):
         if min_dist_norm < self.radius:
             projected_v_n = closest_direction * (closest_direction.dot(self.v[t - 1, 0]))
             projected_v_p = self.v[t - 1, 0] - projected_v_n
-            # print(self.v[t - 1, 0][0])
-            # print(self.v[t - 1, 0][1])
-            # print(projected_v_n[0])
-            # print(projected_v_n[1])
-            # print(projected_v_p[0])
-            # print(projected_v_p[1])
             self.v[t - 1, 0] = projected_v_p - self.elasticity * projected_v_n
-            # print(self.v[t - 1, 0][0])
-            # print(self.v[t - 1, 0][1])
 
         l2_force = self.compute_l2_force()
         friction_force = self.compute_rolling_friction_force(t,)
-        # collision_force = self.x_inc_contrib * self.dt
-        # print(collision_force[0])
-        # print(collision_force[1])
         self.acceleration[t, 0] = (self.world_scale_coeff * l2_force + friction_force) / self.mass
         self.v[t, 0] = self.v[t - 1, 0] + self.acceleration[t, 0] * self.dt
         self.coordinate[t, 0] = self.coordinate[t - 1, 0] + self.v[t, 0] * self.dt
@@ -233,7 +222,7 @@ class RollingBallSim(BaseSim):
 
                 self.gui.circle(
                     self.coordinate[t, 0],
-                    radius=int(self.constants["radius"] * self.world_scale_coeff),
+                    radius=int(self.constants["radius"] * self.world_scale_coeff * 10),
                     color=0xF20530,
                 )
 
