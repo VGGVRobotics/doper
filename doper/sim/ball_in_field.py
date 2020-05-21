@@ -47,9 +47,6 @@ class RollingBallSim(BaseSim):
         x_borders = (0, 1)
         y_borders = (0, 1)
 
-        self.imp = ti.Vector(2, dt=ti.f32)
-        self.x_inc_contrib = ti.Vector(2, dt=ti.f32)
-
         self.dt = ti.var(dt=ti.f32)
         self.radius = ti.var(dt=ti.f32)
         self.g = ti.var(dt=ti.f32)
@@ -63,9 +60,7 @@ class RollingBallSim(BaseSim):
         ti.root.dense(ti.l, self.sim_steps).dense(ti.i, 1).place(
             self.coordinate, self.v, self.acceleration
         )
-        ti.root.place(
-            self.target_coordinate, self.velocity_direction, self.idx, self.imp, self.x_inc_contrib
-        )
+        ti.root.place(self.target_coordinate, self.velocity_direction, self.idx)
         ti.root.place(
             self.dt,
             self.radius,
@@ -97,9 +92,7 @@ class RollingBallSim(BaseSim):
 
         self.dt[None] = self.max_time / self.sim_steps
 
-        self.elasticity[None] = 0.8
-        self.imp[None] = [0.0, 0.0]
-        self.x_inc_contrib[None] = [0.0, 0.0]
+        self.elasticity[None] = 0.99
 
     @ti.func
     def compute_potential_point(self, coord: ti.f32):
@@ -169,6 +162,7 @@ class RollingBallSim(BaseSim):
 
         min_dist_norm = 100000.0
         closest_direction = ti.Vector([0.0, 0.0])
+        projected_v_n = ti.Vector([0.0, 0.0])
         for i in range(self.grid_w):
             for j in range(self.grid_h):
                 obstacle_direction = self.compute_obstacle_direction(t, i, j)
@@ -178,14 +172,17 @@ class RollingBallSim(BaseSim):
                     closest_direction = obstacle_direction / dist_norm
 
         if min_dist_norm < self.radius:
-            print(min_dist_norm)
-            projected_v_n = closest_direction.dot(self.v[t - 1, 0])
+            projected_v_n = closest_direction * (closest_direction.dot(self.v[t - 1, 0]))
             projected_v_p = self.v[t - 1, 0] - projected_v_n
-            print(projected_v_p[0])
-            print(projected_v_p[1])
+            # print(self.v[t - 1, 0][0])
+            # print(self.v[t - 1, 0][1])
+            # print(projected_v_n[0])
+            # print(projected_v_n[1])
+            # print(projected_v_p[0])
+            # print(projected_v_p[1])
             self.v[t - 1, 0] = projected_v_p - self.elasticity * projected_v_n
-            print(self.v[t - 1, 0][0])
-            print(self.v[t - 1, 0][1])
+            # print(self.v[t - 1, 0][0])
+            # print(self.v[t - 1, 0][1])
 
         l2_force = self.compute_l2_force()
         friction_force = self.compute_rolling_friction_force(t,)
@@ -222,13 +219,13 @@ class RollingBallSim(BaseSim):
         self.compute_potential_grid()
         self.compute_potential_grad_grid()
         self.compute_obstacle_grid()
-        print(time() - start)
+        print(f"initialization time {time() - start}")
         self.draw_potentials()
         for t in range(1, self.sim_steps):
             start = time()
             self.find_cell(t - 1)
             self.sim_step(t)
-            print(time() - start)
+            print(f"sim_step time {time() - start}")
             if visualize:
                 self.gui.clear(0x3C733F)
 
@@ -236,7 +233,7 @@ class RollingBallSim(BaseSim):
 
                 self.gui.circle(
                     self.coordinate[t, 0],
-                    radius=int(self.constants["radius"] * self.world_scale_coeff * 10),
+                    radius=int(self.constants["radius"] * self.world_scale_coeff),
                     color=0xF20530,
                 )
 

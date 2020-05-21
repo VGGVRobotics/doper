@@ -31,7 +31,6 @@ class BaseSim:
         self.acceleration = ti.Vector(2, dt=ti.f32)
         self.idx = ti.Vector(2, dt=ti.i32)
 
-
         self.hx = ti.var(dt=ti.f32)
         self.hy = ti.var(dt=ti.f32)
 
