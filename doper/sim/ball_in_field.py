@@ -89,10 +89,9 @@ class RollingBallSim(BaseSim):
         self.ro[None] = self.constants["ro"]
         self.volume[None] = self.constants["volume"]
         self.mass[None] = self.constants["mass"]
+        self.elasticity[None] = self.constants["obstacles_elasticity"]
 
         self.dt[None] = self.max_time / self.sim_steps
-
-        self.elasticity[None] = 0.99
 
     @ti.func
     def compute_potential_point(self, coord: ti.f32):
@@ -109,13 +108,28 @@ class RollingBallSim(BaseSim):
         return potential_local[0] + potential_local[1]
 
     @ti.func
-    def compute_obstacle_direction(
-        self, t: ti.i32, i: int, j: int,
+    def detect_collision(
+        self, t: ti.i32,
     ):
-        # TODO create a structure with obstacle cells coordinates, retrieve closest
-        if self.obstacle_grid[i, j][0] == 1:
-            obstacle_direction = self.coordinate[t - 1, 0] - self.coords_grid[i, j]
-            return obstacle_direction
+        min_dist_norm = 100000.0
+        closest_direction = ti.Vector([0.0, 0.0])
+        for i in range(self.grid_w):
+            for j in range(self.grid_h):
+                if self.obstacle_grid[i, j][0] == 1:
+                    obstacle_direction = self.coordinate[t - 1, 0] - self.coords_grid[i, j]
+                    dist_norm = obstacle_direction.norm()
+                    if dist_norm < min_dist_norm:
+                        min_dist_norm = dist_norm
+                        closest_direction = obstacle_direction / dist_norm
+
+        return closest_direction, min_dist_norm
+
+    @ti.func
+    def collide(self, t: ti.i32, obstacle_direction: ti.f32, distance_to_obstacle: ti.f32):
+        if distance_to_obstacle <= self.radius:
+            projected_v_n = obstacle_direction * (obstacle_direction.dot(self.v[t - 1, 0]))
+            projected_v_p = self.v[t - 1, 0] - projected_v_n
+            self.v[t - 1, 0] = projected_v_p - self.elasticity * projected_v_n
 
     @ti.func
     def compute_l2_force(self):
@@ -159,25 +173,11 @@ class RollingBallSim(BaseSim):
         Args:
             t (ti.i32): time id
         """
-
-        min_dist_norm = 100000.0
-        closest_direction = ti.Vector([0.0, 0.0])
-        projected_v_n = ti.Vector([0.0, 0.0])
-        for i in range(self.grid_w):
-            for j in range(self.grid_h):
-                obstacle_direction = self.compute_obstacle_direction(t, i, j)
-                dist_norm = obstacle_direction.norm()
-                if dist_norm < min_dist_norm:
-                    min_dist_norm = dist_norm
-                    closest_direction = obstacle_direction / dist_norm
-
-        if min_dist_norm < self.radius:
-            projected_v_n = closest_direction * (closest_direction.dot(self.v[t - 1, 0]))
-            projected_v_p = self.v[t - 1, 0] - projected_v_n
-            self.v[t - 1, 0] = projected_v_p - self.elasticity * projected_v_n
-
+        obstacle_direction, distance_to_obstacle = self.detect_collision(t)
+        self.collide(t, obstacle_direction, distance_to_obstacle)
         l2_force = self.compute_l2_force()
         friction_force = self.compute_rolling_friction_force(t,)
+
         self.acceleration[t, 0] = (self.world_scale_coeff * l2_force + friction_force) / self.mass
         self.v[t, 0] = self.v[t - 1, 0] + self.acceleration[t, 0] * self.dt
         self.coordinate[t, 0] = self.coordinate[t - 1, 0] + self.v[t, 0] * self.dt
