@@ -27,7 +27,7 @@ class BaseSim:
         self.target_coordinate = ti.Vector(2, dt=ti.f32)
         self.velocity_direction = ti.Vector(2, dt=ti.f32)
         self.coordinate = ti.Vector(2, dt=ti.f32)
-        self.v = ti.Vector(2, dt=ti.f32)
+        self.velocity = ti.Vector(2, dt=ti.f32)
         self.acceleration = ti.Vector(2, dt=ti.f32)
         self.idx = ti.Vector(2, dt=ti.i32)
 
@@ -36,7 +36,7 @@ class BaseSim:
 
         self.grid_w, self.grid_h = grid_resolution
 
-        ti.root.dense(ti.j, self.grid_w).dense(ti.k, self.grid_h).place(
+        ti.root.dense(ti.i, self.grid_w).dense(ti.j, self.grid_h).place(
             self.potential_gradient_grid, self.potential_grid, self.coords_grid, self.obstacle_grid
         )
 
@@ -50,23 +50,21 @@ class BaseSim:
     def compute_potential_grid(self):
         """Kernel iterates though all the cells in the grid, stores the potential value
         """
-        for i in range(self.grid_w):
-            for j in range(self.grid_h):
-                self.potential_grid[i, j][0] = self.compute_potential_point(self.coords_grid[i, j])
+        for i, j in self.potential_grid:
+            self.potential_grid[i, j][0] = self.compute_potential_point(self.coords_grid[i, j])
 
     @ti.kernel
     def compute_potential_grad_grid(self):
         """Computes gradient grid from the potential grid, generated with compute_potential_grid function
         """
         # https://numpy.org/doc/stable/reference/generated/numpy.gradient.html?highlight=gradient#numpy.gradient
-        for i in range(1, self.grid_w - 1):
-            for j in range(1, self.grid_h - 1):
-                self.potential_gradient_grid[i, j][0] = (
-                    self.potential_grid[i + 1, j][0] - self.potential_grid[i - 1, j][0]
-                ) / (2 * self.hx)
-                self.potential_gradient_grid[i, j][1] = (
-                    self.potential_grid[i, j + 1][0] - self.potential_grid[i, j - 1][0]
-                ) / (2 * self.hy)
+        for i, j in self.potential_gradient_grid:
+            self.potential_gradient_grid[i, j][0] = (
+                self.potential_grid[i + 1, j][0] - self.potential_grid[i - 1, j][0]
+            ) / (2 * self.hx)
+            self.potential_gradient_grid[i, j][1] = (
+                self.potential_grid[i, j + 1][0] - self.potential_grid[i, j - 1][0]
+            ) / (2 * self.hy)
 
     @ti.kernel
     def find_cell(
@@ -77,19 +75,20 @@ class BaseSim:
         Args:
             t (ti.i32): time id
         """
-        self.idx[None][0] = self.coordinate[t, 0][0] // self.hx
-        self.idx[None][1] = self.coordinate[t, 0][1] // self.hy
+        self.idx[None][0] = self.coordinate[t][0] // self.hx
+        self.idx[None][1] = self.coordinate[t][1] // self.hy
 
     @ti.kernel
     def compute_obstacle_grid(self):
-        for i in range(self.grid_w):
-            for j in range(self.grid_h):
-                if i == 0 or \
-                   j == 0 or \
-                   i == self.grid_w - 1 or \
-                   j == self.grid_h - 1 or \
-                   (j == self.grid_h // 2 and i == self.grid_w // 2):
-                    self.obstacle_grid[i, j][0] = 1
+        for i, j in self.obstacle_grid:
+            if (
+                i == 0
+                or j == 0
+                or i == self.grid_w - 1
+                or j == self.grid_h - 1
+                or (j == self.grid_h // 2 and i == self.grid_w // 2)
+            ):
+                self.obstacle_grid[i, j][0] = 1
 
     @ti.kernel
     def sim_step(

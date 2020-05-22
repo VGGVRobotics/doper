@@ -57,9 +57,7 @@ class RollingBallSim(BaseSim):
         self.potential = ti.var(dt=ti.f32)
         self.elasticity = ti.var(dt=ti.f32)
 
-        ti.root.dense(ti.l, self.sim_steps).dense(ti.i, 1).place(
-            self.coordinate, self.v, self.acceleration
-        )
+        ti.root.dense(ti.k, self.sim_steps).place(self.coordinate, self.velocity, self.acceleration)
         ti.root.place(self.target_coordinate, self.velocity_direction, self.idx)
         ti.root.place(
             self.dt,
@@ -113,23 +111,22 @@ class RollingBallSim(BaseSim):
     ):
         min_dist_norm = 100000.0
         closest_direction = ti.Vector([0.0, 0.0])
-        for i in range(self.grid_w):
-            for j in range(self.grid_h):
-                if self.obstacle_grid[i, j][0] == 1:
-                    obstacle_direction = self.coordinate[t - 1, 0] - self.coords_grid[i, j]
-                    dist_norm = obstacle_direction.norm()
-                    if dist_norm < min_dist_norm:
-                        min_dist_norm = dist_norm
-                        closest_direction = obstacle_direction / dist_norm
+        for i, j in self.obstacle_grid:
+            if self.obstacle_grid[i, j][0] == 1:
+                obstacle_direction = self.coordinate[t - 1] - self.coords_grid[i, j]
+                dist_norm = obstacle_direction.norm()
+                if dist_norm < min_dist_norm:
+                    min_dist_norm = dist_norm
+                    closest_direction = obstacle_direction / dist_norm
 
         return closest_direction, min_dist_norm
 
     @ti.func
     def collide(self, t: ti.i32, obstacle_direction: ti.f32, distance_to_obstacle: ti.f32):
         if distance_to_obstacle <= self.radius:
-            projected_v_n = obstacle_direction * (obstacle_direction.dot(self.v[t - 1, 0]))
-            projected_v_p = self.v[t - 1, 0] - projected_v_n
-            self.v[t - 1, 0] = projected_v_p - self.elasticity * projected_v_n
+            projected_v_n = obstacle_direction * (obstacle_direction.dot(self.velocity[t - 1]))
+            projected_v_p = self.velocity[t - 1] - projected_v_n
+            self.velocity[t - 1] = projected_v_p - self.elasticity * projected_v_n
 
     @ti.func
     def compute_l2_force(self):
@@ -155,7 +152,7 @@ class RollingBallSim(BaseSim):
         """
         normal_force = self.mass * self.g
 
-        self.velocity_direction[None] = self.v[t - 1, 0]
+        self.velocity_direction[None] = self.velocity[t - 1]
         if self.velocity_direction[None][0] != 0.0:
             self.velocity_direction[None][0] /= ti.abs(self.velocity_direction[None][0])
 
@@ -178,9 +175,9 @@ class RollingBallSim(BaseSim):
         l2_force = self.compute_l2_force()
         friction_force = self.compute_rolling_friction_force(t,)
 
-        self.acceleration[t, 0] = (self.world_scale_coeff * l2_force + friction_force) / self.mass
-        self.v[t, 0] = self.v[t - 1, 0] + self.acceleration[t, 0] * self.dt
-        self.coordinate[t, 0] = self.coordinate[t - 1, 0] + self.v[t, 0] * self.dt
+        self.acceleration[t] = (self.world_scale_coeff * l2_force + friction_force) / self.mass
+        self.velocity[t] = self.velocity[t - 1] + self.acceleration[t] * self.dt
+        self.coordinate[t] = self.coordinate[t - 1] + self.velocity[t] * self.dt
 
     def run_simulation(
         self,
@@ -200,10 +197,10 @@ class RollingBallSim(BaseSim):
                 [vx, vy] initial speed of the ball
             visualize (bool): show GUI
         """
-        self.coordinate[0, 0] = initial_coordinate
+        self.coordinate[0] = initial_coordinate
         self.target_coordinate[None] = attraction_coordinate
-        self.v[0, 0] = initial_speed
-        self.acceleration[0, 0] = [0.0, 0.0]
+        self.velocity[0] = initial_speed
+        self.acceleration[0] = [0.0, 0.0]
         start = time()
         self.compute_potential_grid()
         self.compute_potential_grad_grid()
@@ -221,11 +218,11 @@ class RollingBallSim(BaseSim):
                 self.gui.circle(self.target_coordinate[None], radius=5, color=0x00000)
 
                 self.gui.circle(
-                    self.coordinate[t, 0],
+                    self.coordinate[t],
                     radius=int(self.constants["radius"] * self.world_scale_coeff * 10),
                     color=0xF20530,
                 )
 
                 self.gui.show()
 
-            print(self.coordinate[t, 0][0], self.coordinate[t, 0][1])
+            print(self.coordinate[t][0], self.coordinate[t][1])
