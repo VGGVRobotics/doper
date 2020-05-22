@@ -15,6 +15,7 @@ if __name__ == "__main__":
         "g": 9.8,
         "f": 0.007,
         "ro": 1000,
+        "obstacles_elasticity": 0.8,
     }
     constants["volume"] = 4 * np.pi * (constants["radius"] ** 3) / 3
     constants["mass"] = constants["volume"] * constants["ro"]
@@ -24,10 +25,13 @@ if __name__ == "__main__":
         sim_steps=20000,
         max_time=40,
         world_scale_coeff=10,
-        grid_resolution=(128, 128),
+        grid_resolution=(512, 512),
         gui=gui,
-        output_folder='./output'
+        output_folder="./output",
     )
     sim.run_simulation(
-        initial_coordinate=[0.2, 0.5], attraction_coordinate=[0.5, 0.5], initial_speed=[0.0, 1.0]
+        initial_coordinate=[0.2, 0.5],
+        attraction_coordinate=[0.5, 0.5],
+        initial_speed=[0.0, 7.0],
+        visualize=True,
     )
