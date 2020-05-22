@@ -109,7 +109,7 @@ class RollingBallSim(BaseSim):
     def detect_collision(
         self, t: ti.i32,
     ):
-        min_dist_norm = 100000.0
+        min_dist_norm = float(np.inf)
         closest_direction = ti.Vector([0.0, 0.0])
         for i, j in self.obstacle_grid:
             if self.obstacle_grid[i, j][0] == 1:
