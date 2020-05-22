@@ -80,6 +80,8 @@ class BaseSim:
 
     @ti.kernel
     def compute_obstacle_grid(self):
+        """Simple function that creates a rasterized obstacle grid
+        """
         for i, j in self.obstacle_grid:
             if (
                 i == 0

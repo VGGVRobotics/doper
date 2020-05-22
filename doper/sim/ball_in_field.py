@@ -109,6 +109,22 @@ class RollingBallSim(BaseSim):
     def detect_collision(
         self, t: ti.i32,
     ):
+        ##############################
+        # WARNING
+        # This collision detection algorithm
+        # results in weird behaviour,
+        # probably due to the stochasticity
+        # in detected obstacles
+        ##############################
+        """Finds closest obstacle on the rasterized obstacle map
+
+        Args:
+            t (ti.i32): timestamp
+
+        Returns:
+            closest_direction (ti.f32): Normalized direction to the nearest obstacle (norm should be one)
+            min_dist_norm (ti.f32): Distance to the nearest obstacle, scalar
+        """
         min_dist_norm = float(np.inf)
         closest_direction = ti.Vector([0.0, 0.0])
         for i, j in self.obstacle_grid:
@@ -123,6 +139,17 @@ class RollingBallSim(BaseSim):
 
     @ti.func
     def collide(self, t: ti.i32, obstacle_direction: ti.f32, distance_to_obstacle: ti.f32):
+        """If nearest obstacle is closer than self.radius, flips normal projection of the speed
+        and multiplies it by self.elasticity
+
+        Args:
+            t (ti.i32): time id
+            obstacle_direction (ti.f32): Normalized direction to the nearest obstacle (norm should be one)
+            distance_to_obstacle (ti.f32): Distance to the nearest obstacle, scalar
+
+        Returns:
+
+        """
         if distance_to_obstacle <= self.radius:
             projected_v_n = obstacle_direction * (obstacle_direction.dot(self.velocity[t - 1]))
             projected_v_p = self.velocity[t - 1] - projected_v_n
