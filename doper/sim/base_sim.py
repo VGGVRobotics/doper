@@ -84,7 +84,11 @@ class BaseSim:
     def compute_obstacle_grid(self):
         for i in range(self.grid_w):
             for j in range(self.grid_h):
-                if (i == 0) | (j == 0) | (i == self.grid_w - 1) | (j == self.grid_h - 1):
+                if i == 0 or \
+                   j == 0 or \
+                   i == self.grid_w - 1 or \
+                   j == self.grid_h - 1 or \
+                   (j == self.grid_h // 2 and i == self.grid_w // 2):
                     self.obstacle_grid[i, j][0] = 1
 
     @ti.kernel
