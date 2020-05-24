@@ -11,7 +11,7 @@ setup(
         "taichi==0.6.5",
         "torch==1.4.0",
         "numpy==1.18.1",
-        "svgpathtools",
+        "svgpathtools==1.3.3",
         "matplotlib",
     ],
 )
