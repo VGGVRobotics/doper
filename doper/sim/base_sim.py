@@ -25,11 +25,11 @@ class BaseSim:
         self.obstacle_grid = ti.Vector(1, dt=ti.i32)
 
         self.target_coordinate = ti.Vector(2, dt=ti.f32)
-        self.velocity_direction = ti.Vector(2, dt=ti.f32)
+        # self.velocity_direction = ti.Vector(2, dt=ti.f32)
         self.coordinate = ti.Vector(2, dt=ti.f32)
         self.velocity = ti.Vector(2, dt=ti.f32)
         self.acceleration = ti.Vector(2, dt=ti.f32)
-        self.idx = ti.Vector(2, dt=ti.i32)
+        # self.idx = ti.Vector(2, dt=ti.i32)
 
         self.hx = ti.var(dt=ti.f32)
         self.hy = ti.var(dt=ti.f32)
@@ -59,6 +59,9 @@ class BaseSim:
         """
         # https://numpy.org/doc/stable/reference/generated/numpy.gradient.html?highlight=gradient#numpy.gradient
         for i, j in self.potential_gradient_grid:
+            if i == 0 or j == 0 or i == self.grid_w - 1 or j == self.grid_h - 1:
+                continue
+
             self.potential_gradient_grid[i, j][0] = (
                 self.potential_grid[i + 1, j][0] - self.potential_grid[i - 1, j][0]
             ) / (2 * self.hx)
@@ -66,17 +69,23 @@ class BaseSim:
                 self.potential_grid[i, j + 1][0] - self.potential_grid[i, j - 1][0]
             ) / (2 * self.hy)
 
-    @ti.kernel
-    def find_cell(
-        self, t: ti.i32,
-    ):
+    @ti.func
+    def find_cell(self, coordinate: ti.f32):
         """Stores the id of the cell the agent is in in the time id t
 
         Args:
             t (ti.i32): time id
         """
-        self.idx[None][0] = self.coordinate[t][0] // self.hx
-        self.idx[None][1] = self.coordinate[t][1] // self.hy
+        idx = ti.Vector([0, 0], dt=ti.i32)
+        idx[0] = coordinate[0] // self.hx
+        idx[1] = coordinate[1] // self.hy
+        frac_x = idx[0] - coordinate[0] / self.hx
+        frac_y = idx[1] - coordinate[1] / self.hy
+        if frac_x >= 0.5:
+            frac_x += 1
+        if frac_y >= 0.5:
+            frac_y += 1
+        return idx
 
     @ti.kernel
     def compute_obstacle_grid(self):
@@ -92,7 +101,6 @@ class BaseSim:
             ):
                 self.obstacle_grid[i, j][0] = 1
 
-    @ti.kernel
     def sim_step(
         self, t: ti.i32,
     ):

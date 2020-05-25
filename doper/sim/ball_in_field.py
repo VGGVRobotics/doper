@@ -1,6 +1,6 @@
 from typing import List, Dict, Tuple, Union
 import os
-from time import time
+from time import time, sleep
 
 import numpy as np
 import taichi as ti
@@ -56,9 +56,12 @@ class RollingBallSim(BaseSim):
         self.mass = ti.var(dt=ti.f32)
         self.potential = ti.var(dt=ti.f32)
         self.elasticity = ti.var(dt=ti.f32)
-
+        self.tmp_coordinate = ti.Vector(2, dt=ti.f32)
+        self.tmp_velocity = ti.Vector(2, dt=ti.f32)
+        self.tmp_acceleration = ti.Vector(2, dt=ti.f32)
+        ti.root.place(self.tmp_coordinate, self.tmp_velocity, self.tmp_acceleration)
         ti.root.dense(ti.k, self.sim_steps).place(self.coordinate, self.velocity, self.acceleration)
-        ti.root.place(self.target_coordinate, self.velocity_direction, self.idx)
+        ti.root.place(self.target_coordinate)
         ti.root.place(
             self.dt,
             self.radius,
@@ -106,105 +109,161 @@ class RollingBallSim(BaseSim):
         return potential_local[0] + potential_local[1]
 
     @ti.func
-    def detect_collision(
-        self, t: ti.i32,
+    def get_toi(self, old_coordinate: ti.f32, old_velocity: ti.f32, obstacle_coordinate: ti.f32):
+        """Computes time of impact
+
+        Args:
+            old_coordinate (ti.f32): coordinate at step before impact
+            old_velocity (ti.f32): impact velocity
+            obstacle_coordinate (ti.f32): obstacle world coordinate
+
+        Returns:
+            (ti.f32): scalar time of impact
+        """
+        old_obstacle_vector = obstacle_coordinate - old_coordinate
+        old_obstacle_distance = old_obstacle_vector.norm()
+        old_obstacle_direction = old_obstacle_vector / old_obstacle_distance
+        toi = abs(old_obstacle_distance - self.radius) / abs(
+            old_obstacle_direction.dot(old_velocity)
+        )
+        # looks suspicious but works pretty ok
+        toi = min(toi, self.dt)
+        return toi
+
+    @ti.func
+    def collide(
+        self, velocity_at_impact: ti.f32, obstacle_direction: ti.f32,
     ):
-        ##############################
-        # WARNING
-        # This collision detection algorithm
-        # results in weird behaviour,
-        # probably due to the stochasticity
-        # in detected obstacles
-        ##############################
-        """Finds closest obstacle on the rasterized obstacle map
+        """Computes velocity after collision
 
         Args:
-            t (ti.i32): timestamp
+            velocity_at_impact (ti.f32): impact velocity
+            obstacle_direction (ti.f32): obstacle normal direction
 
         Returns:
-            closest_direction (ti.f32): Normalized direction to the nearest obstacle (norm should be one)
-            min_dist_norm (ti.f32): Distance to the nearest obstacle, scalar
+            (ti.f32): new velocity vector
         """
-        min_dist_norm = float(np.inf)
-        closest_direction = ti.Vector([0.0, 0.0])
-        for i, j in self.obstacle_grid:
-            if self.obstacle_grid[i, j][0] == 1:
-                obstacle_direction = self.coordinate[t - 1] - self.coords_grid[i, j]
-                dist_norm = obstacle_direction.norm()
-                if dist_norm < min_dist_norm:
-                    min_dist_norm = dist_norm
-                    closest_direction = obstacle_direction / dist_norm
 
-        return closest_direction, min_dist_norm
+        projected_v_n = obstacle_direction * obstacle_direction.dot(velocity_at_impact)
+        projected_v_p = velocity_at_impact - projected_v_n
+        new_velocity = projected_v_p - self.elasticity * projected_v_n
+        return new_velocity
 
     @ti.func
-    def collide(self, t: ti.i32, obstacle_direction: ti.f32, distance_to_obstacle: ti.f32):
-        """If nearest obstacle is closer than self.radius, flips normal projection of the speed
-        and multiplies it by self.elasticity
-
-        Args:
-            t (ti.i32): time id
-            obstacle_direction (ti.f32): Normalized direction to the nearest obstacle (norm should be one)
-            distance_to_obstacle (ti.f32): Distance to the nearest obstacle, scalar
-
-        Returns:
-
-        """
-        if distance_to_obstacle <= self.radius:
-            projected_v_n = obstacle_direction * (obstacle_direction.dot(self.velocity[t - 1]))
-            projected_v_p = self.velocity[t - 1] - projected_v_n
-            self.velocity[t - 1] = projected_v_p - self.elasticity * projected_v_n
-
-    @ti.func
-    def compute_l2_force(self):
+    def compute_l2_force(self, idx: ti.i32):
         """Computes force produced by L2 potential
 
         Returns:
             ti.f32: the amount of force produced by L2 potential
         """
-
-        return -self.potential_gradient_grid[self.idx[None][0], self.idx[None][1]]
+        return -self.potential_gradient_grid[idx[0], idx[1]]
 
     @ti.func
-    def compute_rolling_friction_force(
-        self, t: ti.f32,
-    ):
+    def compute_rolling_friction_force(self, current_velocity: ti.f32):
         """Computes rolling friction force value, flat land assumed
 
         Args:
-            t (ti.i32): time id
+            current_velocity (ti.f32): current velocity vector  
 
         Returns:
-            flti.f32oat: the amount of the rolling friction force
+            (ti.f32): rolling friction force vector
         """
+
         normal_force = self.mass * self.g
+        velocity_direction = ti.Vector([0.0, 0.0])
+        velocity_direction = current_velocity.copy()
+        if velocity_direction[0] != 0.0:
+            velocity_direction[0] /= ti.abs(velocity_direction[0])
 
-        self.velocity_direction[None] = self.velocity[t - 1]
-        if self.velocity_direction[None][0] != 0.0:
-            self.velocity_direction[None][0] /= ti.abs(self.velocity_direction[None][0])
+        if velocity_direction[1] != 0.0:
+            velocity_direction[1] /= ti.abs(velocity_direction[1])
 
-        if self.velocity_direction[None][1] != 0.0:
-            self.velocity_direction[None][1] /= ti.abs(self.velocity_direction[None][1])
+        return -velocity_direction * self.f * normal_force / self.radius
 
-        return -self.velocity_direction * self.f * normal_force / self.radius
+    @ti.func
+    def compute_acceleration(self, coordinate: ti.f32, velocity: ti.f32):
+        """Computes current acceleration vector
+
+        Args:
+            coordinate (ti.f32): current coordinate
+            velocity (ti.f32): current velocity
+
+        Returns:
+            (ti.f32): acceleration vector
+        """
+        l2_force = self.compute_l2_force(self.find_cell(coordinate))
+        friction_force = self.compute_rolling_friction_force(velocity)
+        return (self.world_scale_coeff * l2_force + friction_force) / self.mass
+
+    @ti.func
+    def get_closest_obstacle(self, coordinate: ti.f32):
+        """Finds closest obstacle
+
+        Args:
+            coordinate (ti.f32): current coordinate
+
+        Returns:
+            (ti.f32): closest obstacle_coordinate
+            (ti.f32): distance to the obstacle
+        """
+        min_dist_norm = float(np.inf)
+        closest_coordinate = ti.Vector([0.0, 0.0])
+        for i, j in self.obstacle_grid:
+            if self.obstacle_grid[i, j][0] == 1:
+                obstacle_direction = self.coords_grid[i, j] - coordinate
+                dist_norm = obstacle_direction.norm()
+                if dist_norm < min_dist_norm:
+                    min_dist_norm = dist_norm
+                    closest_coordinate = self.coords_grid[i, j]
+        return closest_coordinate, min_dist_norm
 
     @ti.kernel
-    def sim_step(
+    def try_step(self, t: ti.i32):
+        """Advances physics one step forward without collisions and saves results to tmp variables
+
+        Args:
+            t (ti.i32): current time step
+        """
+        self.tmp_acceleration = self.compute_acceleration(
+            self.coordinate[t - 1], self.velocity[t - 1]
+        )
+        self.tmp_velocity = self.velocity[t - 1] + self.tmp_acceleration * self.dt
+        self.tmp_coordinate = self.tmp_velocity * self.dt + self.coordinate[t - 1]
+
+    @ti.kernel
+    def resolve_collision(
         self, t: ti.i32,
     ):
-        """Makes one step of the simulation
+        """Checks and resolves collisions if any, stores new coordinate, velocity, acceleration
 
         Args:
             t (ti.i32): time id
         """
-        obstacle_direction, distance_to_obstacle = self.detect_collision(t)
-        self.collide(t, obstacle_direction, distance_to_obstacle)
-        l2_force = self.compute_l2_force()
-        friction_force = self.compute_rolling_friction_force(t,)
+        obstacle_coordinate, distance_to_obstacle = self.get_closest_obstacle(self.tmp_coordinate)
+        if distance_to_obstacle <= self.radius:
+            toi = self.get_toi(self.coordinate[t - 1], self.tmp_velocity, obstacle_coordinate)
+            impact_coordinate = self.coordinate[t - 1] + self.tmp_velocity * toi
+            obstacle_direction = obstacle_coordinate - self.coordinate[t - 1]
+            obstacle_direction /= obstacle_direction.norm()
+            velocity_after_collision = self.collide(self.tmp_velocity, obstacle_direction)
+            self.acceleration[t] = self.compute_acceleration(
+                impact_coordinate, velocity_after_collision
+            )
+            self.velocity[t] = velocity_after_collision + self.acceleration[t] * (self.dt - toi)
+            self.coordinate[t] = impact_coordinate + self.velocity[t] * (self.dt - toi)
+        else:
+            self.coordinate[t] = self.tmp_coordinate
+            self.velocity[t] = self.tmp_velocity
+            self.acceleration[t] = self.tmp_acceleration
 
-        self.acceleration[t] = (self.world_scale_coeff * l2_force + friction_force) / self.mass
-        self.velocity[t] = self.velocity[t - 1] + self.acceleration[t] * self.dt
-        self.coordinate[t] = self.coordinate[t - 1] + self.velocity[t] * self.dt
+    def sim_step(self, t: int):
+        """Performs simulation step
+
+        Args:
+            t (int): current time step
+        """
+        self.try_step(t)
+        self.resolve_collision(t)
 
     def run_simulation(
         self,
@@ -236,9 +295,8 @@ class RollingBallSim(BaseSim):
         self.draw_potentials()
         for t in range(1, self.sim_steps):
             start = time()
-            self.find_cell(t - 1)
             self.sim_step(t)
-            print(f"sim_step time {time() - start}")
+            # print(f"sim_step time {time() - start}")
             if visualize:
                 self.gui.clear(0x3C733F)
 
@@ -252,4 +310,4 @@ class RollingBallSim(BaseSim):
 
                 self.gui.show()
 
-            print(self.coordinate[t][0], self.coordinate[t][1])
+            print("coord: ", self.coordinate[t][0], self.coordinate[t][1])
