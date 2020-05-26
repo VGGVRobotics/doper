@@ -1,18 +1,17 @@
-__all__ = ['RollingBallSim']
+__all__ = ['RollingBallPytorchSim']
 
-from typing import List, Dict, Tuple, Union
+from typing import Dict, Tuple, Union
 import os
-from time import time, sleep
+from time import time
 
 import numpy as np
 import taichi as ti
-import matplotlib.pyplot as plt
 
 from .base_sim import BaseSim
 
 
 @ti.data_oriented
-class RollingBallSim(BaseSim):
+class RollingBallPytorchSim(BaseSim):
     def __init__(
         self,
         constants: Dict[str, Union[float, int, str]],
@@ -49,6 +48,9 @@ class RollingBallSim(BaseSim):
         x_borders = (0, 1)
         y_borders = (0, 1)
 
+        self.loss = ti.var(dt=ti.f32)
+        self.initial_coordinate = ti.Vector(2, dt=ti.f32)
+
         self.dt = ti.var(dt=ti.f32)
         self.radius = ti.var(dt=ti.f32)
         self.g = ti.var(dt=ti.f32)
@@ -63,7 +65,7 @@ class RollingBallSim(BaseSim):
         self.tmp_acceleration = ti.Vector(2, dt=ti.f32)
         ti.root.place(self.tmp_coordinate, self.tmp_velocity, self.tmp_acceleration)
         ti.root.dense(ti.k, self.sim_steps).place(self.coordinate, self.velocity, self.acceleration)
-        ti.root.place(self.target_coordinate)
+        ti.root.place(self.target_coordinate, self.initial_coordinate)
         ti.root.place(
             self.dt,
             self.radius,
@@ -77,6 +79,7 @@ class RollingBallSim(BaseSim):
             self.elasticity,
         )
         ti.root.place(self.potential)
+        ti.root.place(self.loss)
         ti.root.lazy_grad()
 
         x_c = np.linspace(*x_borders, self.grid_w)
@@ -107,8 +110,22 @@ class RollingBallSim(BaseSim):
         Returns:
             ti.f32: value of the potential
         """
-        potential_local = (self.target_coordinate - coord) ** 2
-        return potential_local[0] + potential_local[1]
+
+        return 1.  # we assume constant potential here
+
+    @ti.kernel
+    def compute_loss(self, t: ti.i32):
+        """Computes L2 distance between
+        the current coordinate and target point
+
+        Args:
+            t (ti.i32): current timestamp
+
+        Returns:
+            ti.f32: loss value
+        """
+        loss_local = (self.target_coordinate - self.coordinate[t]) ** 2
+        self.loss[None] = loss_local[0] + loss_local[1]
 
     @ti.func
     def get_toi(self, old_coordinate: ti.f32, old_velocity: ti.f32, obstacle_coordinate: ti.f32):
@@ -165,7 +182,7 @@ class RollingBallSim(BaseSim):
         """Computes rolling friction force value, flat land assumed
 
         Args:
-            current_velocity (ti.f32): current velocity vector  
+            current_velocity (ti.f32): current velocity vector
 
         Returns:
             (ti.f32): rolling friction force vector
@@ -285,7 +302,9 @@ class RollingBallSim(BaseSim):
                 [vx, vy] initial speed of the ball
             visualize (bool): show GUI
         """
-        self.coordinate[0] = initial_coordinate
+
+        self.initial_coordinate[None] = initial_coordinate
+        self.coordinate[0] = self.initial_coordinate
         self.target_coordinate[None] = attraction_coordinate
         self.velocity[0] = initial_speed
         self.acceleration[0] = [0.0, 0.0]
@@ -312,4 +331,6 @@ class RollingBallSim(BaseSim):
 
                 self.gui.show()
 
-            print("coord: ", self.coordinate[t][0], self.coordinate[t][1])
+            #print("coord: ", self.coordinate[t][0], self.coordinate[t][1])
+
+        self.compute_loss(t)
