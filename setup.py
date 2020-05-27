@@ -8,7 +8,7 @@ setup(
     packages=find_packages(),
     python_requires=">=3.6",
     install_requires=[
-        "taichi==0.6.5",
+        "taichi==0.6.6",
         "torch==1.4.0",
         "numpy==1.18.1",
         "svgpathtools==1.3.3",

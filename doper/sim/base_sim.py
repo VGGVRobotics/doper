@@ -122,11 +122,11 @@ class BaseSim:
         pot_grad_np = pot_grad_np + np.abs(pot_grad_np.min())
         plt.imsave(
             os.path.join(self.output_folder, "potential_g0.jpg"),
-            pot_grad_np[:, :, 0] / pot_grad_np.max(),
+            pot_grad_np[:, :, 0] / (pot_grad_np.max() + 1e-3),
         )
         plt.imsave(
             os.path.join(self.output_folder, "potential_g1.jpg"),
-            pot_grad_np[:, :, 1] / pot_grad_np.max(),
+            pot_grad_np[:, :, 1] / (pot_grad_np.max() + 1e-3),
         )
 
         plt.imsave(

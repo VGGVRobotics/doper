@@ -63,6 +63,10 @@ class RollingBallPytorchSim(BaseSim):
         self.tmp_coordinate = ti.Vector(2, dt=ti.f32)
         self.tmp_velocity = ti.Vector(2, dt=ti.f32)
         self.tmp_acceleration = ti.Vector(2, dt=ti.f32)
+        self.obstacle_coordinate = ti.Vector(2, dt=ti.f32)
+        self.distance_to_obstacle = ti.var(dt=ti.f32)
+
+        ti.root.place(self.obstacle_coordinate, self.distance_to_obstacle)
         ti.root.place(self.tmp_coordinate, self.tmp_velocity, self.tmp_acceleration)
         ti.root.dense(ti.k, self.sim_steps).place(self.coordinate, self.velocity, self.acceleration)
         ti.root.place(self.target_coordinate, self.initial_coordinate)
@@ -210,11 +214,11 @@ class RollingBallPytorchSim(BaseSim):
         Returns:
             (ti.f32): acceleration vector
         """
-        l2_force = self.compute_l2_force(self.find_cell(coordinate))
+        l2_force = 0. #self.compute_l2_force(self.find_cell(coordinate))
         friction_force = self.compute_rolling_friction_force(velocity)
         return (self.world_scale_coeff * l2_force + friction_force) / self.mass
 
-    @ti.func
+    @ti.kernel
     def get_closest_obstacle(self, coordinate: ti.f32):
         """Finds closest obstacle
 
@@ -234,7 +238,8 @@ class RollingBallPytorchSim(BaseSim):
                 if dist_norm < min_dist_norm:
                     min_dist_norm = dist_norm
                     closest_coordinate = self.coords_grid[i, j]
-        return closest_coordinate, min_dist_norm
+        self.obstacle_coordinate[None] = closest_coordinate
+        self.distance_to_obstacle[None] = min_dist_norm
 
     @ti.kernel
     def try_step(self, t: ti.i32):
@@ -258,11 +263,10 @@ class RollingBallPytorchSim(BaseSim):
         Args:
             t (ti.i32): time id
         """
-        obstacle_coordinate, distance_to_obstacle = self.get_closest_obstacle(self.tmp_coordinate)
-        if distance_to_obstacle <= self.radius:
-            toi = self.get_toi(self.coordinate[t - 1], self.tmp_velocity, obstacle_coordinate)
+        if self.distance_to_obstacle <= self.radius:
+            toi = self.get_toi(self.coordinate[t - 1], self.tmp_velocity, self.obstacle_coordinate)
             impact_coordinate = self.coordinate[t - 1] + self.tmp_velocity * toi
-            obstacle_direction = obstacle_coordinate - self.coordinate[t - 1]
+            obstacle_direction = self.obstacle_coordinate - self.coordinate[t - 1]
             obstacle_direction /= obstacle_direction.norm()
             velocity_after_collision = self.collide(self.tmp_velocity, obstacle_direction)
             self.acceleration[t] = self.compute_acceleration(
@@ -282,6 +286,7 @@ class RollingBallPytorchSim(BaseSim):
             t (int): current time step
         """
         self.try_step(t)
+        self.get_closest_obstacle(t)
         self.resolve_collision(t)
 
     def run_simulation(
@@ -304,7 +309,7 @@ class RollingBallPytorchSim(BaseSim):
         """
 
         self.initial_coordinate[None] = initial_coordinate
-        self.coordinate[0] = self.initial_coordinate
+        self.coordinate[0] = initial_coordinate
         self.target_coordinate[None] = attraction_coordinate
         self.velocity[0] = initial_speed
         self.acceleration[0] = [0.0, 0.0]
@@ -332,5 +337,4 @@ class RollingBallPytorchSim(BaseSim):
                 self.gui.show()
 
             #print("coord: ", self.coordinate[t][0], self.coordinate[t][1])
-
         self.compute_loss(t)

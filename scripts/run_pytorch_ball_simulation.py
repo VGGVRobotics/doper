@@ -22,10 +22,10 @@ if __name__ == "__main__":
 
     sim = RollingBallPytorchSim(
         constants=constants,
-        sim_steps=20,
-        max_time=0.1,
+        sim_steps=200,
+        max_time=1.,
         world_scale_coeff=10,
-        grid_resolution=(512, 512),
+        grid_resolution=(32, 32),
         gui=gui,
         output_folder="./output",
     )
@@ -38,3 +38,4 @@ if __name__ == "__main__":
             visualize=False,
         )
         print(sim.initial_coordinate.grad[None][0])
+        #print(sim.loss[None])
