@@ -22,8 +22,8 @@ if __name__ == "__main__":
 
     sim = RollingBallSim(
         constants=constants,
-        sim_steps=20000,
-        max_time=40,
+        sim_steps=200,
+        max_time=1,
         world_scale_coeff=10,
         grid_resolution=(512, 512),
         gui=gui,

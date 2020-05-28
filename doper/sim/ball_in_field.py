@@ -226,11 +226,11 @@ class RollingBallSim(BaseSim):
         Args:
             t (ti.i32): current time step
         """
-        self.tmp_acceleration = self.compute_acceleration(
+        self.tmp_acceleration[None] = self.compute_acceleration(
             self.coordinate[t - 1], self.velocity[t - 1]
         )
-        self.tmp_velocity = self.velocity[t - 1] + self.tmp_acceleration * self.dt
-        self.tmp_coordinate = self.tmp_velocity * self.dt + self.coordinate[t - 1]
+        self.tmp_velocity[None] = self.velocity[t - 1] + self.tmp_acceleration * self.dt
+        self.tmp_coordinate[None] = self.tmp_velocity * self.dt + self.coordinate[t - 1]
 
     @ti.kernel
     def resolve_collision(

@@ -25,11 +25,11 @@ class BaseSim:
         self.obstacle_grid = ti.Vector(1, dt=ti.i32)
 
         self.target_coordinate = ti.Vector(2, dt=ti.f32)
-        # self.velocity_direction = ti.Vector(2, dt=ti.f32)
+        self.velocity_direction = ti.Vector(2, dt=ti.f32)
         self.coordinate = ti.Vector(2, dt=ti.f32)
         self.velocity = ti.Vector(2, dt=ti.f32)
         self.acceleration = ti.Vector(2, dt=ti.f32)
-        # self.idx = ti.Vector(2, dt=ti.i32)
+        self.idx = ti.Vector(2, dt=ti.i32)
 
         self.hx = ti.var(dt=ti.f32)
         self.hy = ti.var(dt=ti.f32)
@@ -39,6 +39,8 @@ class BaseSim:
         ti.root.dense(ti.i, self.grid_w).dense(ti.j, self.grid_h).place(
             self.potential_gradient_grid, self.potential_grid, self.coords_grid, self.obstacle_grid
         )
+        ti.root.place(self.idx)
+        ti.root.place(self.velocity_direction)
 
     @ti.func
     def compute_potential_point(self):
@@ -69,23 +71,22 @@ class BaseSim:
                 self.potential_grid[i, j + 1][0] - self.potential_grid[i, j - 1][0]
             ) / (2 * self.hy)
 
-    @ti.func
-    def find_cell(self, coordinate: ti.f32):
+    @ti.kernel
+    def find_cell(self, t: ti.i32):
         """Stores the id of the cell the agent is in in the time id t
 
         Args:
             t (ti.i32): time id
         """
-        idx = ti.Vector([0, 0], dt=ti.i32)
-        idx[0] = coordinate[0] // self.hx
-        idx[1] = coordinate[1] // self.hy
-        frac_x = idx[0] - coordinate[0] / self.hx
-        frac_y = idx[1] - coordinate[1] / self.hy
+        self.idx[None][0] = self.coordinate[t][0] // self.hx
+        self.idx[None][1] = self.coordinate[t][1] // self.hy
+        frac_x = self.idx[None][0] - self.coordinate[t][0] / self.hx
+        frac_y = self.idx[None][1] - self.coordinate[t][1] / self.hy
         if frac_x >= 0.5:
-            frac_x += 1
+            self.idx[None][0] += 1
         if frac_y >= 0.5:
-            frac_y += 1
-        return idx
+            self.idx[None][1] += 1
+
 
     @ti.kernel
     def compute_obstacle_grid(self):
