@@ -29,13 +29,15 @@ if __name__ == "__main__":
         gui=gui,
         output_folder="./output",
     )
+    sim.initial_speed[None] = [1.0, 1.0]
 
-    with ti.Tape(sim.loss):
-        sim.run_simulation(
-            initial_coordinate=[0.2, 0.5],
-            attraction_coordinate=[0.5, 0.5],
-            initial_speed=[0.0, 7.0],
-            visualize=False,
-        )
-        print(sim.initial_coordinate.grad[None][0])
-        #print(sim.loss[None])
+    for i in range(10):
+        with ti.Tape(sim.loss):
+            sim.run_simulation(
+                initial_coordinate=[0.2, 0.5],
+                attraction_coordinate=[0.5, 0.5],
+                visualize=False,
+            )
+        print(f'loss is {sim.loss[None]:.4f}', sim.initial_speed.grad[None][0], sim.initial_speed.grad[None][1])
+        sim.initial_speed[None][0] -= 0.01 * sim.initial_speed.grad[None][0]
+        sim.initial_speed[None][1] -= 0.01 * sim.initial_speed.grad[None][1]

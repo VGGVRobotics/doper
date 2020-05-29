@@ -3,7 +3,6 @@ import os
 
 import numpy as np
 import taichi as ti
-import matplotlib.pyplot as plt
 
 from .base_sim import BaseSim
 
@@ -60,7 +59,7 @@ class RollingBallPytorchSim(BaseSim):
         self.tmp_coordinate = ti.Vector(2, dt=ti.f32)
         self.tmp_velocity = ti.Vector(2, dt=ti.f32)
         self.tmp_acceleration = ti.Vector(2, dt=ti.f32)
-        self.initial_coordinate = ti.Vector(2, dt=ti.f32)
+        self.initial_speed = ti.Vector(2, dt=ti.f32)
         ti.root.place(self.tmp_coordinate, self.tmp_velocity, self.tmp_acceleration)
         ti.root.dense(ti.k, self.sim_steps).place(self.coordinate, self.velocity, self.acceleration)
         ti.root.place(self.target_coordinate)
@@ -76,7 +75,7 @@ class RollingBallPytorchSim(BaseSim):
             self.hy,
             self.elasticity,
         )
-        ti.root.place(self.potential, self.loss, self.initial_coordinate)
+        ti.root.place(self.potential, self.loss, self.initial_speed)
         ti.root.lazy_grad()
 
         x_c = np.linspace(*x_borders, self.grid_w)
@@ -96,33 +95,10 @@ class RollingBallPytorchSim(BaseSim):
 
         self.dt[None] = self.max_time / self.sim_steps
 
-    @ti.func
-    def compute_potential_point(self, coord: ti.f32):
-        """Computes the potential, defined as L2 distance between
-        the current coordinate and target poing
-
-        Args:
-            coord (ti.f32): current coordinate
-
-        Returns:
-            ti.f32: value of the potential
-        """
-        return 1.
-
     @ti.kernel
     def compute_loss(self, t: ti.i32):
         potential_local = (self.target_coordinate - self.coordinate[t]) ** 2
         self.loss[None] = potential_local[0] + potential_local[1]
-
-    @ti.func
-    def compute_l2_force(self):
-        """Computes force produced by L2 potential
-
-        Returns:
-            ti.f32: the amount of force produced by L2 potential
-        """
-
-        return -self.potential_gradient_grid[self.idx[None][0], self.idx[None][1]]
 
     @ti.func
     def compute_rolling_friction_force(
@@ -156,18 +132,24 @@ class RollingBallPytorchSim(BaseSim):
         Args:
             t (ti.i32): time id
         """
-        l2_force = self.compute_l2_force()
         friction_force = self.compute_rolling_friction_force(t,)
-        self.acceleration[t] = (self.world_scale_coeff * l2_force + friction_force) / self.mass
+        self.acceleration[t] = friction_force / self.mass
 
         self.velocity[t] = self.velocity[t - 1] + self.acceleration[t] * self.dt
         self.coordinate[t] = self.coordinate[t - 1] + self.velocity[t] * self.dt
+
+    @ti.kernel
+    def initialize(self):
+        for t in range(self.sim_steps):
+            self.coordinate[t] = ti.Vector([0.0, 0.0])
+            self.acceleration[t] = ti.Vector([0.0, 0.0])
+            self.velocity[t] = ti.Vector([0.0, 0.0])
+        self.velocity[0] = self.initial_speed
 
     def run_simulation(
         self,
         initial_coordinate: Tuple[float, float],
         attraction_coordinate: Tuple[float, float],
-        initial_speed: Tuple[float, float],
         visualize: bool = True,
     ):
         """Runs simulation
@@ -180,16 +162,11 @@ class RollingBallPytorchSim(BaseSim):
             initial_speed (Tuple[float, float]):
                 [vx, vy] initial speed of the ball
         """
-        self.initial_coordinate[None] = initial_coordinate
+        self.initialize()
         self.coordinate[0] = initial_coordinate
         self.target_coordinate[None] = attraction_coordinate
-        self.velocity[0] = initial_speed
         self.acceleration[0] = [0.0, 0.0]
-        self.compute_potential_grid()
-        self.compute_potential_grad_grid()
-        self.draw_potentials()
         for t in range(1, self.sim_steps):
-            self.find_cell(t-1)
             self.sim_step(t)
             if visualize:
                 self.gui.clear(0x3C733F)
