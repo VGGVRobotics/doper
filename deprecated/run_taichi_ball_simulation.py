@@ -1,7 +1,7 @@
 import taichi as ti
 import numpy as np
 
-from doper.sim import RollingBallSim
+from deprecated.taichi.sim import RollingBallSim
 
 
 ti.init(arch=ti.cpu, default_fp=ti.f32)
