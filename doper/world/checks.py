@@ -74,3 +74,31 @@ def polygons_in_rect_area(
         if np.any(is_point_inside_rect):
             res.append(p)
     return res
+
+
+def batch_point_to_segment_distance(
+    point: np.ndarray, segments: np.ndarray, normals: np.ndarray, signed: bool = False
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Finds distances from point to a set of segments
+
+    Args:
+        point (np.ndarray): (2,) array of point coordinates
+        segments (np.ndarray): (N, 2, 2) array of segments endpoints
+        normals (np.ndarray): (N, 2) array of normals
+
+    Returns:
+        Tuple(np.ndarray, np.ndarray): (N,) array of distances to segments,
+            (N,) bool array if point projection is inside the segment
+    """
+    endpoint_vectors = point.reshape(1, -1) - segments[:, 0]
+    segments_vectors = segments[:, 1] - segments[:, 0]
+    segments_vectors_len = np.linalg.norm(segments_vectors, axis=-1)
+    t = (endpoint_vectors * segments_vectors).sum(axis=-1) / segments_vectors_len ** 2
+    t = t.clip(0, 1)
+    projections = segments[:, 0] + t.reshape(-1, 1) * segments_vectors
+    proj_vec = point.reshape(1, -1) - projections
+    distances = np.linalg.norm(proj_vec, axis=-1)
+    if signed:
+        distances = distances * np.sign((proj_vec * normals).sum(axis=-1))
+    is_inner = np.logical_and(t < 1, t > 0)
+    return distances, is_inner

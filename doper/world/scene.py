@@ -1,7 +1,11 @@
 from typing import List, Union, Tuple
 import numpy as np
 from .shapes import Polygon
-from .checks import batch_line_ray_intersection_point, polygons_in_rect_area
+from .checks import (
+    batch_line_ray_intersection_point,
+    polygons_in_rect_area,
+    batch_point_to_segment_distance,
+)
 
 
 class Scene:
@@ -12,6 +16,19 @@ class Scene:
             polygons (List[Polygon]): list of polygones
         """
         self._polygons = polygons
+        self._segment_to_polygon = []
+        self._all_segments = []
+        self._all_normals = []
+        for i, polygon in enumerate(self._polygons):
+            segments = polygon.segments
+            self._segment_to_polygon.extend([i] * len(segments))
+            self._all_segments.append(segments)
+            self._all_normals.append(polygon.normals)
+
+        self._all_segments = np.concatenate(self._all_segments, axis=0)
+        self._all_normals = np.concatenate(self._all_normals, axis=0)
+        self._segment_to_polygon = np.array(self._segment_to_polygon)
+        self._segment_idxs = np.arange(len(self._all_segments))
 
     def get_polygons_segments(self, polygons: List[Polygon]) -> np.ndarray:
         """Get concatenated segments of given polygones.
@@ -22,7 +39,7 @@ class Scene:
         Returns:
             np.ndarray: [n_segments, 2, 2] array of segment endpoints
         """
-        return np.concatenate([p.segments for p in polygons], axis=0)
+        return self._all_segments
 
     def get_polygons_in_area(
         self,
@@ -43,7 +60,7 @@ class Scene:
     def get_polygons_in_radius(
         self, center: Union[np.ndarray, Tuple[float, float]], radius: float
     ) -> List[Polygon]:
-        """TBD
+        """Returns all polygons in given radius
 
         Args:
             center (Union[np.ndarray, Tuple[float, float]]): center of the area
@@ -52,8 +69,40 @@ class Scene:
         Returns:
             List[Polygon]: list of polygons
         """
-        # TODO: add inside radii filtering
-        return self._polygons
+        # TODO: use kd-tree for fast query
+        center = np.array(center)
+        distances, _ = batch_point_to_segment_distance(
+            center, self._all_segments, self._all_normals
+        )
+        polygon_idxs = set(self._segment_to_polygon[self._segment_idxs[distances <= radius]])
+        return [self._polygons[i] for i in polygon_idxs]
+
+    def get_closest_geometry(
+        self, point: Union[np.ndarray, Tuple[float, float]]
+    ) -> Tuple[np.ndarray, np.ndarray, float, bool]:
+        """Returns closest segment, segment normal and distance to the point
+
+        Args:
+            point (Union[np.ndarray, Tuple): point to measure distance to
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray, float, bool]: tuple of shapes (2, 2), (2), scalar, segment,
+             it's normal, distance value, and flag whether closest point is inside the segment or it's corner
+        """
+
+        # TODO: use kd-tree for fast query
+        point = np.array(point)
+        distances, is_inner = batch_point_to_segment_distance(
+            point, self._all_segments, self._all_normals
+        )
+        # distances[distances < 0] = np.inf
+        closest_idx = np.argmin(distances)
+        return (
+            self._all_segments[closest_idx],
+            self._all_normals[closest_idx],
+            distances[closest_idx],
+            is_inner[closest_idx],
+        )
 
     def get_all_polygons(self) -> List[Polygon]:
         """Returns all scene polygons
