@@ -1,5 +1,5 @@
 from typing import List, Union, Tuple
-import numpy as np
+import jax.numpy as np
 from .shapes import Polygon
 from .checks import (
     batch_line_ray_intersection_point,
@@ -30,6 +30,9 @@ class Scene:
         self._segment_to_polygon = np.array(self._segment_to_polygon)
         self._segment_idxs = np.arange(len(self._all_segments))
 
+    def get_all_segments(self) -> np.ndarray:
+        return self.get_polygons_segments(self.get_all_polygons())
+
     def get_polygons_segments(self, polygons: List[Polygon]) -> np.ndarray:
         """Get concatenated segments of given polygones.
 
@@ -39,7 +42,7 @@ class Scene:
         Returns:
             np.ndarray: [n_segments, 2, 2] array of segment endpoints
         """
-        return self._all_segments
+        return np.concatenate([p.segments for p in polygons], axis=0)
 
     def get_polygons_in_area(
         self,
@@ -70,7 +73,7 @@ class Scene:
             List[Polygon]: list of polygons
         """
         # TODO: use kd-tree for fast query
-        center = np.array(center)
+        # center = np.array(center)
         distances, _ = batch_point_to_segment_distance(
             center, self._all_segments, self._all_normals
         )
@@ -91,7 +94,7 @@ class Scene:
         """
 
         # TODO: use kd-tree for fast query
-        point = np.array(point)
+        # point = np.array(point)
         distances, is_inner = batch_point_to_segment_distance(
             point, self._all_segments, self._all_normals
         )

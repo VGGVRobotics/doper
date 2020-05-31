@@ -2,6 +2,7 @@ import numpy as np
 from doper.world.assets import get_svg_scene
 from doper.world.visualizer import TaichiRenderer
 from doper.world.observations import UndirectedRangeSensor
+from time import time
 
 
 if __name__ == "__main__":
@@ -21,6 +22,9 @@ if __name__ == "__main__":
             elif gui.ti_gui.event.key == "s":
                 sensor_pos[1] -= 0.01
         ranges, points = sensor.get_observation(sensor_pos, scene, True)
+        start = time()
+        result = scene.get_closest_geometry(sensor_pos)
+        print(time() - start)
         print(scene.get_polygons_in_radius(sensor_pos, 3.5))
         print(scene.get_closest_geometry(sensor_pos))
         gui.render(sensor_pos=sensor_pos, ray_intersection_points=points)
