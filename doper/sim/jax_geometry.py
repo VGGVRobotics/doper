@@ -8,14 +8,12 @@ import jax.numpy as np
 JaxScene = namedtuple("JaxScene", ["segments"])
 
 
-@jax.jit
 def compute_segment_normal_projection(point: np.ndarray, segment: np.ndarray) -> np.ndarray:
     normal = np.concatenate([segment[1], -segment[0]])
     normal = normal / np.linalg.norm(normal)
     return np.dot(point, normal) * normal
 
 
-@jax.jit
 def compute_segment_projection(
     point: np.ndarray, segment: np.ndarray
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -28,17 +26,15 @@ def compute_segment_projection(
     return point_projection, is_inner
 
 
-@jax.jit
 def compute_distance_to_segment(point: np.ndarray, segment: np.ndarray) -> np.ndarray:
     point_on_segment, _ = compute_segment_projection(point, segment)
     distance = np.linalg.norm(point - point_on_segment, axis=-1)
     return distance
 
 
-compute_distance_to_segments_batch = jax.jit(jax.vmap(compute_distance_to_segment, (None, 0), 0))
+compute_distance_to_segments_batch = jax.vmap(compute_distance_to_segment, (None, 0), 0)
 
 
-@jax.jit
 def find_closest_segment_to_point(
     point: np.ndarray, segments_batch: np.ndarray
 ) -> Tuple[np.ndarray, np.ndarray]:

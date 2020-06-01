@@ -1,31 +1,27 @@
 from collections import namedtuple
 from functools import partial
 
+import jax
 import jax.numpy as np
-from jax import jit, grad
+from jax import grad
 from jax import lax
 from .jax_geometry import find_closest_segment_to_point, compute_segment_projection
 
 BallState = namedtuple("BallState", ["coordinate", "velocity", "acceleration"])
 
 
-@jit
-def compute_potential_point(coord, target_coord):
-    return np.sum((coord - target_coord) ** 2)
+def compute_potential_point(coord, attractor_coord):
+    return np.sum((coord - attractor_coord) ** 2)
 
 
-@jit
 def compute_rolling_friction_force(velocity, mass, radius, f, g=9.8):
-    return -np.sign(velocity) * mass * g * radius * f / radius
+    return -np.sign(velocity) * mass * g * f / radius
 
 
-@jit
 def compute_acceleration(potential_force, friction_force, mass):
-    # return friction_force / mass
     return (potential_force + friction_force) / mass
 
 
-@jit
 def get_new_state(current_state, new_acceleration, dt):
     new_velocity = current_state.velocity + new_acceleration * dt
     new_coordinate = current_state.coordinate + new_velocity * dt
@@ -34,7 +30,6 @@ def get_new_state(current_state, new_acceleration, dt):
     )
 
 
-@jit
 def resolve_collision(args):
     current_state, new_state, attractor, closest_segment, constants, dt = args
     # find toi
@@ -71,7 +66,6 @@ def resolve_collision(args):
     return get_new_state(state_after_impact, new_acceleration, dt - toi)
 
 
-@jit
 def collide(current_state, new_state, attractor, closest_segment, distance, constants, dt):
     # debug
     # if distance <= constants["radius"]:
@@ -88,7 +82,6 @@ def collide(current_state, new_state, attractor, closest_segment, distance, cons
     )
 
 
-@jit
 def sim_step(current_state, t, scene, attractor, constants, dt):
     l2_force = -grad(compute_potential_point)(current_state.coordinate, attractor)
     friction_force = compute_rolling_friction_force(
@@ -105,11 +98,8 @@ def sim_step(current_state, t, scene, attractor, constants, dt):
     return current_state, current_state
 
 
-@jit
-def run_sim(scene, coordinate_init, velocity_init, attractor, constants):
+def _run_sim(sim_time, n_steps, scene, coordinate_init, velocity_init, attractor, constants):
     trajectory = []
-    sim_time = 5
-    n_steps = 1000
     dt = sim_time / n_steps
     current_state = BallState(
         coordinate=coordinate_init,
@@ -129,7 +119,22 @@ def run_sim(scene, coordinate_init, velocity_init, attractor, constants):
     return current_state.coordinate, trajectory
 
 
-@jit
-def compute_loss(scene, coordinate_init, velocity_init, target_coordinate, attractor, constants):
-    final_coord, _ = run_sim(scene, coordinate_init, velocity_init, attractor, constants)
+def _compute_loss(
+    sim_time,
+    n_steps,
+    scene,
+    coordinate_init,
+    velocity_init,
+    target_coordinate,
+    attractor,
+    constants,
+):
+    final_coord, _ = run_sim(
+        sim_time, n_steps, scene, coordinate_init, velocity_init, attractor, constants
+    )
     return np.sum(np.abs(final_coord - target_coordinate))
+
+
+run_sim = jax.jit(_run_sim, static_argnums=(0, 1))
+
+compute_loss = jax.jit(_compute_loss, static_argnums=(0, 1))
