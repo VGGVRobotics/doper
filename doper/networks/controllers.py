@@ -1,12 +1,11 @@
 __all__ = ["LinearReLUController"]
 
-import torch
 import torch.nn as nn
 
 
 class LinearReLUController(nn.Module):
     def __init__(self, model_config):
-        super().__init__(self)
+        super().__init__()
         input_dim = model_config['input_dim']
         internal_dim = model_config['internal_dim']
         output_dim = model_config['output_dim']

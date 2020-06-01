@@ -15,5 +15,6 @@ setup(
         "jaxlib==0.1.47",
         "svgpathtools==1.3.3",
         "matplotlib",
+        "pyyaml",
     ],
 )

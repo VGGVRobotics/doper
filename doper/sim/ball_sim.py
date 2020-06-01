@@ -5,6 +5,7 @@ import jax
 import jax.numpy as np
 from jax import grad
 from jax import lax
+
 from .jax_geometry import find_closest_segment_to_point, compute_segment_projection
 
 BallState = namedtuple("BallState", ["coordinate", "velocity", "acceleration"])
@@ -53,14 +54,14 @@ def resolve_collision(args):
     obstacle_direction = obstacle_vector / obstacle_distance
     projected_v_n = obstacle_direction * obstacle_direction.dot(velocity_at_impact)
     projected_v_p = velocity_at_impact - projected_v_n
-    velocity_after_impact = projected_v_p - constants["elasticity"] * projected_v_n
+    velocity_after_impact = projected_v_p - constants["walls_elasticity"] * projected_v_n
     # make final step
     state_after_impact = BallState(
         sub_state.coordinate, velocity_after_impact, sub_state.acceleration
     )
     l2_force = -grad(compute_potential_point)(sub_state.coordinate, attractor)
     friction_force = compute_rolling_friction_force(
-        state_after_impact.velocity, constants["mass"], constants["radius"], constants["f"]
+        state_after_impact.velocity, constants["mass"], constants["radius"], constants["rolling_friction_coefficient"]
     )
     new_acceleration = compute_acceleration(l2_force, friction_force, constants["mass"])
     return get_new_state(state_after_impact, new_acceleration, dt - toi)
@@ -85,9 +86,9 @@ def collide(current_state, new_state, attractor, closest_segment, distance, cons
 def sim_step(current_state, t, scene, attractor, attractor_strength, constants, dt):
     l2_force = -grad(compute_potential_point)(current_state.coordinate, attractor)
     friction_force = compute_rolling_friction_force(
-        current_state.velocity, constants["mass"], constants["radius"], constants["f"]
+        current_state.velocity, constants["mass"], constants["radius"], constants["rolling_friction_coefficient"]
     )
-    acceleration = compute_acceleration(attractor_strength * l2_force, friction_force, constants["mass"])
+    acceleration = compute_acceleration(attractor_strength * l2_force, 0 * friction_force, constants["mass"])
     may_be_state = get_new_state(current_state, acceleration, dt)
     closest_segment, distance = find_closest_segment_to_point(
         may_be_state.coordinate, scene.segments

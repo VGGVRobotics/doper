@@ -1,5 +1,5 @@
 from typing import List, Union, Tuple
-import jax.numpy as np
+import numpy as np
 from .shapes import Polygon
 from .checks import (
     batch_line_ray_intersection_point,
