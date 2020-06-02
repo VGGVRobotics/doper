@@ -40,26 +40,25 @@ class BallAttractorTrainer:
         self.batch_size = self.config["train"]["batch_size"]
 
         self.vmapped_loss = jax.vmap(
-            compute_loss, in_axes=(None, None, None, 0, 0, None, None, None, None)
+            compute_loss, in_axes=(None, None, None, 0, 0, None, None, None)
         )
         # TODO should we add jax.jit here?
         self.vmapped_grad_and_value = jax.value_and_grad(
-            lambda s, n, sc, c, v, t, a, ast, constants: np.sum(
-                self.vmapped_loss(s, n, sc, c, v, t, a, ast, constants)
+            lambda s, n, sc, c, v, t, a, constants: np.sum(
+                self.vmapped_loss(s, n, sc, c, v, t, a, constants)
             ),
             4,
         )
 
     def forward(self, observation, coordinate_init):
         velocity_init = self.controller(observation)
-        final_coordinate, trajectory = run_sim(
+        final_coordinate, final_velocity, trajectory = run_sim(
             self.sim_time,
             self.n_steps,
             self.jax_scene,
             coordinate_init[0],
             pytorch_to_jax(velocity_init[0]),
             np.array(self.config["sim"]["attractor_coordinate"]),
-            np.array(self.config["sim"]["attractor_strength"]),
             self.constants,
         )
         return velocity_init, trajectory
@@ -74,7 +73,6 @@ class BallAttractorTrainer:
             pytorch_to_jax(velocity_init),
             np.array(self.config["sim"]["coordinate_target"]),
             np.array(self.config["sim"]["attractor_coordinate"]),
-            self.config["sim"]["attractor_strength"],
             self.constants,
         )
         logger.info(f"Gradients from simulation are {v_grad}")
@@ -89,9 +87,10 @@ class BallAttractorTrainer:
             coordinate_init - onp.array(self.config["sim"]["coordinate_target"]), axis=1
         ).reshape(-1, 1)
         direction = (coordinate_init - onp.array(self.config["sim"]["coordinate_target"])) / dist
-        # range_obs = self.sensor.get_observation(position=coordinate_init, scene=self.scene)
-        # range_obs /= self.config["sim"]["distance_range"]
-        return input_to_pytorch([dist, direction, coordinate_init])
+        range_obs = [self.sensor.get_observation(position=coord, scene=self.scene) for coord in coordinate_init]
+        range_obs = onp.stack(range_obs, axis=0)
+        range_obs /= self.config["sim"]["distance_range"]
+        return input_to_pytorch([dist, direction, coordinate_init, range_obs])
 
     def write_output(self, trajectory, output_file_name):
         lines = mc.LineCollection(self.scene.get_all_segments())
@@ -118,4 +117,4 @@ class BallAttractorTrainer:
         plt.close()
 
     def get_init_state(self):
-        return np.array(onp.random.uniform((-2.0, 2.0), (0.0, 4.0), size=(self.batch_size, 2)))
+        return np.array(onp.random.uniform((-2.0, -4.0), (-4.0, 4.0), size=(self.batch_size, 2)))

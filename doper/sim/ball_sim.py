@@ -17,7 +17,9 @@ def compute_potential_point(coord, attractor_coord):
 
 
 def compute_rolling_friction_force(velocity, mass, radius, f, g=9.8):
-    return -np.clip(velocity, -1, 1) * mass * g * f / radius  # ugly hack to reduce friction after slowing down
+    return (
+        -np.clip(velocity, -1, 1) * mass * g * f / radius
+    )  # ugly hack to reduce friction after slowing down
 
 
 def compute_acceleration(potential_force, friction_force, mass):
@@ -62,7 +64,10 @@ def resolve_collision(args):
     )
     l2_force = -grad(compute_potential_point)(sub_state.coordinate, attractor)
     friction_force = compute_rolling_friction_force(
-        state_after_impact.velocity, constants["mass"], constants["radius"], constants["rolling_friction_coefficient"]
+        state_after_impact.velocity,
+        constants["mass"],
+        constants["radius"],
+        constants["rolling_friction_coefficient"],
     )
     new_acceleration = compute_acceleration(l2_force, friction_force, constants["mass"])
     return get_new_state(state_after_impact, new_acceleration, dt - toi)
@@ -84,12 +89,17 @@ def collide(current_state, new_state, attractor, closest_segment, distance, cons
     )
 
 
-def sim_step(current_state, t, scene, attractor, attractor_strength, constants, dt):
+def sim_step(current_state, t, scene, attractor, constants, dt):
     l2_force = -grad(compute_potential_point)(current_state.coordinate, attractor)
     friction_force = compute_rolling_friction_force(
-        current_state.velocity, constants["mass"], constants["radius"], constants["rolling_friction_coefficient"]
+        current_state.velocity,
+        constants["mass"],
+        constants["radius"],
+        constants["rolling_friction_coefficient"],
     )
-    acceleration = compute_acceleration(attractor_strength * l2_force, friction_force, constants["mass"])
+    acceleration = compute_acceleration(
+        constants["attractor_strength"] * l2_force, friction_force, constants["mass"]
+    )
     may_be_state = get_new_state(current_state, acceleration, dt)
     closest_segment, distance = find_closest_segment_to_point(
         may_be_state.coordinate, scene.segments
@@ -101,30 +111,15 @@ def sim_step(current_state, t, scene, attractor, attractor_strength, constants, 
 
 
 def _run_sim(
-    sim_time,
-    n_steps,
-    scene,
-    coordinate_init,
-    velocity_init,
-    attractor,
-    attractor_strength,
-    constants,
+    sim_time, n_steps, scene, coordinate_init, velocity_init, attractor, constants,
 ):
-    trajectory = []
     dt = sim_time / n_steps
     current_state = BallState(
         coordinate=coordinate_init,
         velocity=velocity_init,
         acceleration=np.zeros_like(velocity_init),
     )
-    step = partial(
-        sim_step,
-        scene=scene,
-        attractor=attractor,
-        attractor_strength=attractor_strength,
-        constants=constants,
-        dt=dt,
-    )
+    step = partial(sim_step, scene=scene, attractor=attractor, constants=constants, dt=dt,)
 
     current_state, trajectory = lax.scan(step, init=current_state, xs=None, length=n_steps)
     # useful to have this loop for no jit debug
@@ -134,7 +129,7 @@ def _run_sim(
     #     trajectory.append(current_state)
     #     current_state, _ = step(current_state, i)
 
-    return current_state.coordinate, trajectory
+    return current_state.coordinate, current_state.velocity, trajectory
 
 
 def _compute_loss(
@@ -145,19 +140,31 @@ def _compute_loss(
     velocity_init,
     target_coordinate,
     attractor,
-    attractor_strength,
     constants,
 ):
-    final_coord, _ = run_sim(
-        sim_time,
-        n_steps,
-        scene,
-        coordinate_init,
-        velocity_init,
-        attractor,
-        attractor_strength,
-        constants,
+    final_coord, final_velocity, trajectory = run_sim(
+        sim_time, n_steps, scene, coordinate_init, velocity_init, attractor, constants,
     )
+    return np.sum(np.abs(final_coord - target_coordinate))
+
+
+def _compute_loss_sequential(
+    sim_time,
+    n_steps,
+    scene,
+    coordinate_init,
+    velocity_list,
+    target_coordinate,
+    attractor,
+    constants,
+):
+    assert len(velocity_list) == 5
+    coordinate = coordinate_init
+    for action_id in range(5):
+        final_coord, final_velocity, trajectory = run_sim(
+        sim_time, n_steps, scene, coordinate, velocity_list[action_id], attractor, constants,
+    )
+        coordinate = final_coord
     return np.sum(np.abs(final_coord - target_coordinate))
 
 

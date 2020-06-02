@@ -1,15 +1,15 @@
 constants:
   radius: 0.05
   density: 1000
-  rolling_friction_coefficient: 0.007
+  rolling_friction_coefficient: 0. #0.007
   walls_elasticity: 0.8
+  attractor_strength: 0.01
 
 sim:
   n_steps: 2000
   sim_time: 2.0
   coordinate_target: [6.0, 4.0]
   attractor_coordinate: [-3.0, 2.0]
-  attractor_strength: 0.01
   svg_scene_path: /home/gleb/code/repos/doper/assets/simple_level.svg
   distance_range: 1000
   angle_step: 20
@@ -17,13 +17,13 @@ sim:
 train:
   trainer_name: BallAttractorTrainer
   n_iters: 50000
-  val_iter: 10
+  val_iter: 20
   logging_level: INFO
   device: cpu
   output_folder: ./output/
-  batch_size: 16
+  batch_size: 8
 
 model:
-  input_dim: 5
+  input_dim: 23
   output_dim: 2
   hidden_dim: 50
