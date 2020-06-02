@@ -1,13 +1,13 @@
 constants:
-  radius: 0.05
-  density: 1000
-  rolling_friction_coefficient: 0. #0.007
+  radius: 0.1
+  density: 3000
+  rolling_friction_coefficient: 0.007
   walls_elasticity: 0.8
-  attractor_strength: 0.1
+  attractor_strength: 0.01
 
 sim:
-  n_steps: 1000
-  sim_time: 1.
+  n_steps: 300
+  sim_time: 0.3
   coordinate_target: [6.0, 4.0]
   attractor_coordinate: [-3.0, 2.0]
   svg_scene_path: /home/gleb/code/repos/doper/assets/simple_level.svg
@@ -21,10 +21,10 @@ train:
   logging_level: INFO
   device: cpu
   output_folder: ./output/
-  batch_size: 8
-  num_actions: 4
+  batch_size: 16
+  num_actions: 8
 
 model:
-  input_dim: 23
+  input_dim: 25
   output_dim: 2
   hidden_dim: 50

@@ -47,7 +47,7 @@ class BallAttractorTrainer:
 
         def prepare_loss(s, n, sc, c, v, t, a, constants):
             loss_out = self.vmapped_loss(s, n, sc, c, v, t, a, constants)
-            return np.sum(loss_out[0]), *loss_out[1:]
+            return np.sum(loss_out[0]), loss_out[1:]
 
         self.vmapped_grad_and_value = jax.value_and_grad(
             lambda s, n, sc, c, v, t, a, constants: prepare_loss(s, n, sc, c, v, t, a, constants),
@@ -55,44 +55,45 @@ class BallAttractorTrainer:
             has_aux=True
         )
 
-    def forward(self, observation, coordinate_init):
-        velocity_init = self.controller(observation)
+    def forward(self, observation, coordinate_init, velocity_init):
+        impulse = self.controller(observation)
         final_coordinate, final_velocity, trajectory = run_sim(
             self.sim_time,
             self.n_steps,
             self.jax_scene,
             coordinate_init[0],
-            pytorch_to_jax(velocity_init[0]),
+            pytorch_to_jax((torch.from_numpy(onp.array(velocity_init)) + impulse / self.constants["mass"])[0]),
             np.array(self.config["sim"]["attractor_coordinate"]),
             self.constants,
         )
-        return final_coordinate, velocity_init, trajectory
+        return final_coordinate, final_velocity, trajectory
 
     def optimize_parameters(self, grad_clip=5):
         coordinate_init = self.get_init_state()
         self.optimizer.zero_grad()
-
+        velocity_init = onp.random.uniform(-1, 2, (self.batch_size, 2))
         for action_id in range(self.num_actions):
-            observation = self.get_observations(coordinate_init)
-            velocity_init = self.controller(observation)
-            (loss_val, coord), v_grad = self.vmapped_grad_and_value(
+            observation = self.get_observations(coordinate_init, velocity_init)
+            impulse = self.controller(observation)
+            (loss_val, (coord, velocity)), v_grad = self.vmapped_grad_and_value(
                 self.sim_time,
                 self.n_steps,
                 self.jax_scene,
                 coordinate_init,
-                pytorch_to_jax(velocity_init),
+                pytorch_to_jax(torch.from_numpy(velocity_init) + impulse / self.constants["mass"]),
                 np.array(self.config["sim"]["coordinate_target"]),
                 np.array(self.config["sim"]["attractor_coordinate"]),
                 self.constants,
             )
             pytorch_grad = jax_grads_to_pytorch(v_grad).to(self.device)
-            velocity_init.backward(pytorch_grad)  # norm?
+            impulse.backward(pytorch_grad)  # norm?
             coordinate_init = coord
+            velocity_init = velocity_init
         torch.nn.utils.clip_grad_norm_(self.controller.parameters(), grad_clip)
         self.optimizer.step()
         return loss_val
 
-    def get_observations(self, coordinate_init):
+    def get_observations(self, coordinate_init, velocity_init):
         dist = onp.linalg.norm(
             coordinate_init - onp.array(self.config["sim"]["coordinate_target"]), axis=1
         ).reshape(-1, 1)
@@ -103,7 +104,7 @@ class BallAttractorTrainer:
         ]
         range_obs = onp.stack(range_obs, axis=0)
         range_obs /= self.config["sim"]["distance_range"]
-        return input_to_pytorch([dist, direction, coordinate_init, range_obs])
+        return input_to_pytorch([dist, direction, coordinate_init, velocity_init, range_obs])
 
     def write_output(self, trajectory, output_file_name):
         lines = mc.LineCollection(self.scene.get_all_segments())

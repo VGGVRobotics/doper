@@ -145,7 +145,7 @@ def _compute_loss(
     final_coord, final_velocity, trajectory = run_sim(
         sim_time, n_steps, scene, coordinate_init, velocity_init, attractor, constants,
     )
-    return np.sum(np.abs(final_coord - target_coordinate)), final_coord
+    return np.sum(np.abs(final_coord - target_coordinate)), final_coord, final_velocity
 
 
 run_sim = jax.jit(_run_sim, static_argnums=(0, 1))
