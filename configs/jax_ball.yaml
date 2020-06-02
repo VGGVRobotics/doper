@@ -5,24 +5,25 @@ constants:
   walls_elasticity: 0.8
 
 sim:
-  n_steps: 1000
+  n_steps: 2000
   sim_time: 2.0
-  coordinate_target: [3.0, 2.5]
-  attractor_coordinate: [4.0, 3.5]
-  attractor_strength: 0.
-  svg_scene_path: /home/gleb/code/repos/doper/assets/two_triangles.svg
-  distance_range: 500
+  coordinate_target: [6.0, 4.0]
+  attractor_coordinate: [-3.0, 2.0]
+  attractor_strength: 0.01
+  svg_scene_path: /home/gleb/code/repos/doper/assets/simple_level.svg
+  distance_range: 1000
   angle_step: 20
 
 train:
   trainer_name: BallAttractorTrainer
-  n_iters: 2000
-  val_iter: 50
+  n_iters: 50000
+  val_iter: 10
   logging_level: INFO
   device: cpu
   output_folder: ./output/
+  batch_size: 16
 
 model:
-  input_dim: 21
+  input_dim: 5
   output_dim: 2
-  internal_dim: 50
+  hidden_dim: 50

@@ -6,7 +6,7 @@ from time import time
 
 
 if __name__ == "__main__":
-    scene = get_svg_scene("../assets/simple_level.svg", px_per_meter=50)
+    scene = get_svg_scene("./assets/simple_level.svg", px_per_meter=50)
     gui = TaichiRenderer(scene=scene, px_per_meter=50, window_size_meters=(12, 9))
     sensor = UndirectedRangeSensor(distance_range=3.5, angle_step=1)
     sensor_pos = np.array((1.0, 1.0))

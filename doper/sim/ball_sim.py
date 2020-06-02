@@ -9,6 +9,7 @@ from jax import lax
 from .jax_geometry import find_closest_segment_to_point, compute_segment_projection
 
 BallState = namedtuple("BallState", ["coordinate", "velocity", "acceleration"])
+Constants = namedtuple("SimulationConstants", ["coordinate", "velocity", "acceleration"])
 
 
 def compute_potential_point(coord, attractor_coord):
@@ -16,7 +17,7 @@ def compute_potential_point(coord, attractor_coord):
 
 
 def compute_rolling_friction_force(velocity, mass, radius, f, g=9.8):
-    return -np.sign(velocity) * mass * g * f / radius
+    return -np.clip(velocity, -1, 1) * mass * g * f / radius  # ugly hack to reduce friction after slowing down
 
 
 def compute_acceleration(potential_force, friction_force, mass):
@@ -88,7 +89,7 @@ def sim_step(current_state, t, scene, attractor, attractor_strength, constants, 
     friction_force = compute_rolling_friction_force(
         current_state.velocity, constants["mass"], constants["radius"], constants["rolling_friction_coefficient"]
     )
-    acceleration = compute_acceleration(attractor_strength * l2_force, 0 * friction_force, constants["mass"])
+    acceleration = compute_acceleration(attractor_strength * l2_force, friction_force, constants["mass"])
     may_be_state = get_new_state(current_state, acceleration, dt)
     closest_segment, distance = find_closest_segment_to_point(
         may_be_state.coordinate, scene.segments

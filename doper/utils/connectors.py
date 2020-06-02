@@ -17,7 +17,7 @@ def input_to_pytorch(controller_inputs: List[Sequence]) -> torch.Tensor:
     """
     controller_input = torch.cat(
         [
-            torch.from_numpy(onp.array(sensor_reading).astype(onp.float32)).view(1, -1)
+            torch.from_numpy(onp.array(sensor_reading).astype(onp.float32))
             for sensor_reading in controller_inputs
         ],
         dim=1,
