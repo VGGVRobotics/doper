@@ -38,16 +38,21 @@ class BallAttractorTrainer:
             self.config["sim"]["distance_range"], self.config["sim"]["angle_step"]
         )
         self.batch_size = self.config["train"]["batch_size"]
+        self.num_actions = self.config["train"]["num_actions"]
 
         self.vmapped_loss = jax.vmap(
             compute_loss, in_axes=(None, None, None, 0, 0, None, None, None)
         )
         # TODO should we add jax.jit here?
+
+        def prepare_loss(s, n, sc, c, v, t, a, constants):
+            loss_out = self.vmapped_loss(s, n, sc, c, v, t, a, constants)
+            return np.sum(loss_out[0]), *loss_out[1:]
+
         self.vmapped_grad_and_value = jax.value_and_grad(
-            lambda s, n, sc, c, v, t, a, constants: np.sum(
-                self.vmapped_loss(s, n, sc, c, v, t, a, constants)
-            ),
+            lambda s, n, sc, c, v, t, a, constants: prepare_loss(s, n, sc, c, v, t, a, constants),
             4,
+            has_aux=True
         )
 
     def forward(self, observation, coordinate_init):
@@ -61,24 +66,31 @@ class BallAttractorTrainer:
             np.array(self.config["sim"]["attractor_coordinate"]),
             self.constants,
         )
-        return velocity_init, trajectory
+        return final_coordinate, velocity_init, trajectory
 
-    def optimize_parameters(self, observation, coordinate_init, grad_clip=5):
-        velocity_init = self.controller(observation)
-        loss_val, v_grad = self.vmapped_grad_and_value(
-            self.sim_time,
-            self.n_steps,
-            self.jax_scene,
-            coordinate_init,
-            pytorch_to_jax(velocity_init),
-            np.array(self.config["sim"]["coordinate_target"]),
-            np.array(self.config["sim"]["attractor_coordinate"]),
-            self.constants,
-        )
-        logger.info(f"Gradients from simulation are {v_grad}")
-        pytorch_grad = jax_grads_to_pytorch(np.clip(v_grad, -grad_clip, grad_clip)).to(self.device)
+    def optimize_parameters(self, grad_clip=5):
+        coordinate_init = self.get_init_state()
+        grads = []
+        velocities = []
         self.optimizer.zero_grad()
-        velocity_init.backward(pytorch_grad)
+
+        for action_id in range(self.num_actions):
+            observation = self.get_observations(coordinate_init)
+            velocity_init = self.controller(observation)
+            (loss_val, v_grad), coord = self.vmapped_grad_and_value(
+                self.sim_time,
+                self.n_steps,
+                self.jax_scene,
+                coordinate_init,
+                pytorch_to_jax(velocity_init),
+                np.array(self.config["sim"]["coordinate_target"]),
+                np.array(self.config["sim"]["attractor_coordinate"]),
+                self.constants,
+            )
+            pytorch_grad = jax_grads_to_pytorch(np.clip(v_grad, -grad_clip, grad_clip)).to(self.device)
+            velocity_init.backward(pytorch_grad)  # norm?
+            coordinate_init = coord
+        logger.info(f"Gradients from simulation are {np.mean(v_grad, axis=0)}")
         self.optimizer.step()
         return loss_val
 
@@ -87,17 +99,21 @@ class BallAttractorTrainer:
             coordinate_init - onp.array(self.config["sim"]["coordinate_target"]), axis=1
         ).reshape(-1, 1)
         direction = (coordinate_init - onp.array(self.config["sim"]["coordinate_target"])) / dist
-        range_obs = [self.sensor.get_observation(position=coord, scene=self.scene) for coord in coordinate_init]
+        range_obs = [
+            self.sensor.get_observation(position=coord, scene=self.scene)
+            for coord in coordinate_init
+        ]
         range_obs = onp.stack(range_obs, axis=0)
         range_obs /= self.config["sim"]["distance_range"]
         return input_to_pytorch([dist, direction, coordinate_init, range_obs])
 
     def write_output(self, trajectory, output_file_name):
+        print(trajectory.shape)
         lines = mc.LineCollection(self.scene.get_all_segments())
         fig, ax = plt.subplots()
 
         ax.add_collection(lines)
-        traj = onp.array(trajectory.coordinate)
+        traj = onp.array(trajectory)
         ax.scatter(traj[0, 0], traj[0, 1], c="g", label="init")
         ax.scatter(
             self.config["sim"]["attractor_coordinate"][0],

@@ -145,27 +145,7 @@ def _compute_loss(
     final_coord, final_velocity, trajectory = run_sim(
         sim_time, n_steps, scene, coordinate_init, velocity_init, attractor, constants,
     )
-    return np.sum(np.abs(final_coord - target_coordinate))
-
-
-def _compute_loss_sequential(
-    sim_time,
-    n_steps,
-    scene,
-    coordinate_init,
-    velocity_list,
-    target_coordinate,
-    attractor,
-    constants,
-):
-    assert len(velocity_list) == 5
-    coordinate = coordinate_init
-    for action_id in range(5):
-        final_coord, final_velocity, trajectory = run_sim(
-        sim_time, n_steps, scene, coordinate, velocity_list[action_id], attractor, constants,
-    )
-        coordinate = final_coord
-    return np.sum(np.abs(final_coord - target_coordinate))
+    return np.sum(np.abs(final_coord - target_coordinate)), final_coord
 
 
 run_sim = jax.jit(_run_sim, static_argnums=(0, 1))
