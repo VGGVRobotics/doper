@@ -10,9 +10,14 @@ sim:
   sim_time: 0.3
   coordinate_target: [6.0, 4.0]
   attractor_coordinate: [-3.0, 2.0]
-  svg_scene_path: /home/gleb/code/repos/doper/assets/simple_level.svg
-  distance_range: 1000
-  angle_step: 20
+  scene_name: SingleScene
+  scene_params:
+    svg_scene_path: /home/gleb/code/repos/doper/assets/simple_level.svg
+    px_per_meter: 50
+  agent_name: RangeSensingAgent
+  agent_params:
+    distance_range: 1000
+    angle_step: 20
 
 train:
   trainer_name: BallAttractorTrainer

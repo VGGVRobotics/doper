@@ -5,7 +5,8 @@ import logging
 
 import numpy as onp
 
-from doper import trainers
+from doper import trainers, agents, scenes
+from doper.utils.loggers import write_output
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -16,7 +17,7 @@ if __name__ == "__main__":
     with open(config_path) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
-    device = config['train']['device']
+    device = config["train"]["device"]
     output_folder = config["train"]["output_folder"]
     os.makedirs(output_folder, exist_ok=True)
 
@@ -28,23 +29,30 @@ if __name__ == "__main__":
         level=getattr(logging, config["train"]["logging_level"].upper()),
     )
 
-    logger = logging.getLogger('root')
+    logger = logging.getLogger("root")
 
     trainer = getattr(trainers, config["train"]["trainer_name"])(config)
+    agent = getattr(agents, config["sim"]["agent_name"])(config)
+    scene_handler = getattr(scenes, config["sim"]["scene_name"])(config)
 
     for iteration in range(config["train"]["n_iters"]):
-        loss_val = trainer.optimize_parameters()
-        logger.info(f'Iteration {iteration}: Loss {loss_val}')
+        loss_val = trainer.optimize_parameters(agent, scene_handler)
+        logger.info(f"Iteration {iteration}: Loss {loss_val}")
         if iteration % config["train"]["val_iter"] == 0:
-            init_state = trainer.get_init_state()[[0]]
+            init_state = scene_handler.get_init_state(1)[[0]]
             velocity_init = onp.zeros_like(init_state)
             trajectories = []
             for i in range(trainer.num_actions):
-                observation = trainer.get_observations(init_state, velocity_init)
-                final_coordinate, velocity, trajectory = trainer.forward(observation, init_state, velocity_init)
+                observation = agent.get_observations(init_state, velocity_init, scene_handler)
+                final_coordinate, velocity, trajectory = trainer.forward(
+                    observation, init_state, velocity_init, scene_handler
+                )
                 init_state = final_coordinate.reshape(1, -1)
                 velocity_init = velocity.reshape(1, -1)
                 trajectories.append(trajectory.coordinate)
-            trainer.write_output(
-                onp.concatenate(trajectories), os.path.join(output_folder, f"trajectory_iter_{iteration}.jpg")
+            write_output(
+                onp.concatenate(trajectories),
+                os.path.join(output_folder, f"trajectory_iter_{iteration}.jpg"),
+                scene_handler,
+                config,
             )

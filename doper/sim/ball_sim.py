@@ -148,6 +148,19 @@ def _compute_loss(
     return np.sum(np.abs(final_coord - target_coordinate)), final_coord, final_velocity
 
 
+def reduce_loss(s, n, sc, c, v, t, a, constants):
+    loss_out = vmapped_loss(s, n, sc, c, v, t, a, constants)
+    return np.sum(loss_out[0]), loss_out[1:]
+
+
 run_sim = jax.jit(_run_sim, static_argnums=(0, 1))
 
 compute_loss = jax.jit(_compute_loss, static_argnums=(0, 1))
+
+vmapped_loss = jax.vmap(compute_loss, in_axes=(None, None, None, 0, 0, None, None, None))
+
+vmapped_grad_and_value = jax.value_and_grad(
+    lambda s, n, sc, c, v, t, a, constants: reduce_loss(s, n, sc, c, v, t, a, constants),
+    4,
+    has_aux=True,
+)
