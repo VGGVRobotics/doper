@@ -6,6 +6,14 @@ from matplotlib import collections as mc
 
 
 def write_output(trajectory: onp.ndarray, output_file_name: os.PathLike, scene_handler: object, config: dict):
+    """
+    Writes images with trajectories and scene
+    Args:
+        trajectory: [steps, 2] numpy.ndarray with agents trajectory
+        output_file_name: name of the output image
+        scene_handler: scene handler object, containing the scene
+        config: configuration dict
+    """
     lines = mc.LineCollection(scene_handler.scene.get_all_segments())
     fig, ax = plt.subplots()
 

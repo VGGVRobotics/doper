@@ -25,7 +25,6 @@ class BallAttractorTrainer:
         self.sim_time = config["sim"]["sim_time"]
         self.n_steps = config["sim"]["n_steps"]
         self.optimizer = torch.optim.Adam(self.controller.parameters())
-
         self.batch_size = self.config["train"]["batch_size"]
         self.num_actions = self.config["train"]["num_actions"]
 
