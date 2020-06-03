@@ -39,8 +39,12 @@ class TaichiRenderer:
         ):
             for i in range(len(poly.segments)):
                 segment = poly.segments[i].copy()
+                normal = poly.normals[i].copy()
                 segment = segment / self._window_size_meters
+                normal = normal / self._window_size_meters
+                midpoint = (segment[1] + segment[0]) / 2
                 self._gui.line(segment[1], segment[0], color=0xFF00FF)
+                self._gui.line(midpoint, midpoint + normal)
 
     def _render_sensor(
         self,

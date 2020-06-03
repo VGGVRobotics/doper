@@ -1,3 +1,4 @@
+# flake8: noqa: F401
 from .scene import Scene
 from .visualizer import TaichiRenderer
 from .shapes import Polygon

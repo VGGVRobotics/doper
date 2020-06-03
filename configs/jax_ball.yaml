@@ -1,0 +1,35 @@
+constants:
+  radius: 0.1
+  density: 3000
+  rolling_friction_coefficient: 0.007
+  walls_elasticity: 0.8
+  attractor_strength: 0.01
+
+sim:
+  n_steps: 300
+  sim_time: 0.3
+  coordinate_target: [6.0, 4.0]
+  attractor_coordinate: [-3.0, 2.0]
+  scene_name: SingleScene
+  scene_params:
+    svg_scene_path: /home/gleb/code/repos/doper/assets/simple_level.svg
+    px_per_meter: 50
+  agent_name: RangeSensingAgent
+  agent_params:
+    distance_range: 1000
+    angle_step: 20
+
+train:
+  trainer_name: BallAttractorTrainer
+  n_iters: 50000
+  val_iter: 20
+  logging_level: INFO
+  device: cpu
+  output_folder: ./output/
+  batch_size: 16
+  num_actions: 8
+
+model:
+  input_dim: 25
+  output_dim: 2
+  hidden_dim: 50

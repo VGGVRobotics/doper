@@ -28,12 +28,12 @@ def svg2polygons(fname: str, scale: float) -> List[Polygon]:
         if not all([isinstance(l, Line) for l in path]):
             print(f"Only simple line figures are currently allowed, skipping")
             continue
+        # TODO: check lines color and set orientation
         poly = Polygon([line_begin_end(line, scale, w, h) for line in path])
         if "transform" in attr and "rotate" in attr["transform"]:
             angle, cx, cy = eval(attr["transform"].replace("rotate", ""))
             cx, cy = cx, h - cy
             poly.rotate(angle, (cx / scale, cy / scale))
-
         polygons.append(poly)
 
     return polygons
