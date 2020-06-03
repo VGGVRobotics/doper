@@ -29,13 +29,13 @@ class BallAttractorTrainer:
         self.num_actions = self.config["train"]["num_actions"]
 
     def forward(self, observation, coordinate_init, velocity_init, scene):
-        impulse = self.controller(observation)
+        impulse = self.controller(observation.to(self.device))
         final_coordinate, final_velocity, trajectory = run_sim(
             self.sim_time,
             self.n_steps,
             scene.jax_scene,
             coordinate_init[0],
-            pytorch_to_jax((torch.from_numpy(onp.array(velocity_init)) + impulse / self.constants["mass"])[0]),
+            pytorch_to_jax((torch.from_numpy(onp.array(velocity_init)) + impulse.cpu() / self.constants["mass"])[0]),
             np.array(self.config["sim"]["attractor_coordinate"]),
             self.constants,
         )
@@ -47,13 +47,13 @@ class BallAttractorTrainer:
         velocity_init = onp.random.uniform(-1, 2, (self.batch_size, 2))
         for action_id in range(self.num_actions):
             observation = agent.get_observations(coordinate_init, velocity_init, scene_handler)
-            impulse = self.controller(observation)
+            impulse = self.controller(observation.to(self.device))
             (loss_val, (coord, velocity)), v_grad = vmapped_grad_and_value(
                 self.sim_time,
                 self.n_steps,
                 scene_handler.jax_scene,
                 coordinate_init,
-                pytorch_to_jax(torch.from_numpy(velocity_init) + impulse / self.constants["mass"]),
+                pytorch_to_jax(torch.from_numpy(velocity_init) + impulse.cpu() / self.constants["mass"]),
                 np.array(self.config["sim"]["coordinate_target"]),
                 np.array(self.config["sim"]["attractor_coordinate"]),
                 self.constants,

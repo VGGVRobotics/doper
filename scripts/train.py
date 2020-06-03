@@ -4,6 +4,7 @@ import os
 import logging
 
 import numpy as onp
+from jax.config import config as jax_config
 
 from doper import trainers, agents, scenes
 from doper.utils.loggers import write_output
@@ -18,6 +19,13 @@ if __name__ == "__main__":
         config = yaml.load(f, Loader=yaml.FullLoader)
 
     device = config["train"]["device"]
+    if "cpu" in device:
+        jax_config.update('jax_platform_name', 'cpu')
+    elif "cuda" in device:
+        jax_config.update('jax_platform_name', 'gpu')
+    else:
+        raise ValueError(f"Device {device} is not available, use cuda or cpu")
+
     output_folder = config["train"]["output_folder"]
     os.makedirs(output_folder, exist_ok=True)
 
