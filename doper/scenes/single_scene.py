@@ -3,16 +3,16 @@ __all__ = ["SingleScene"]
 import numpy as onp
 import jax.numpy as np
 
-from doper.sim.jax_geometry import JaxScene
 from doper.world.assets import get_svg_scene
 
 
 class SingleScene:
     def __init__(self, config: dict):
         self.config = config
-        self.scene = get_svg_scene(config["sim"]["scene_params"]["svg_scene_path"],
-                                   px_per_meter=config["sim"]["scene_params"]["px_per_meter"])
-        self.jax_scene = JaxScene(segments=np.array(self.scene.get_all_segments()))
+        self.jax_scene = get_svg_scene(
+            config["sim"]["scene_params"]["svg_scene_path"],
+            px_per_meter=config["sim"]["scene_params"]["px_per_meter"],
+        )
 
     def get_init_state(self, batch_size: int):
         """
