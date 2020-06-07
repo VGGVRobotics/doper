@@ -32,6 +32,7 @@ def sort_segments(segments: onp.ndarray, orientation: str) -> onp.ndarray:
         segments (np.ndarray): segments to sort
         orientation (str): sorting order, either clockwise or counterclockwise
     """
+    print(segments.shape)
     idxs = onp.arange(len(segments))
     remaining_idxs = set(idxs)
     order = []
@@ -107,7 +108,11 @@ def get_svg_scene(fname: str, px_per_meter: float = 50) -> JaxScene:
         polygon = create_polygon(
             sort_segments(
                 segments=onp.concatenate(
-                    [line_begin_end(line, px_per_meter, w, h) for line in path], axis=0
+                    [
+                        onp.array(line_begin_end(line, px_per_meter, w, h))[onp.newaxis]
+                        for line in path
+                    ],
+                    axis=0,
                 ),
                 orientation="counterclockwise",
             )
@@ -116,7 +121,7 @@ def get_svg_scene(fname: str, px_per_meter: float = 50) -> JaxScene:
         if "transform" in attr and "rotate" in attr["transform"]:
             angle, cx, cy = eval(attr["transform"].replace("rotate", ""))
             cx, cy = cx, h - cy
-            rotate_polygon(polygon, angle, (cx / px_per_meter, cy / px_per_meter))
+            polygon = rotate_polygon(polygon, angle, (cx / px_per_meter, cy / px_per_meter))
         polygons.append(polygon)
 
     return create_scene(polygons)

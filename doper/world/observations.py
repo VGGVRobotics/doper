@@ -1,7 +1,7 @@
 from typing import Tuple, Union, Optional
-import numpy as np
-from .scene import Scene
-from .checks import batch_line_ray_intersection_point
+import numpy as onp
+import jax.numpy as np
+from doper.sim.jax_geometry import JaxScene, batch_line_ray_intersection_point
 
 
 class Sensor:
@@ -24,58 +24,59 @@ class SimpleRangeSensor(Sensor):
             angle_step (float): ray angular step
         """
         self._distance_range = distance_range
-        self._angle_range_rad = angle_range / 180 * np.pi
-        self._angle_step_rad = angle_step / 180 * np.pi
+        self._angle_range_rad = angle_range / 180 * onp.pi
+        self._angle_step_rad = angle_step / 180 * onp.pi
 
     def get_observation(
         self,
-        position: Union[np.ndarray, Tuple[float, float]],
-        heading_direction: Union[np.ndarray, Tuple[float, float]],
-        scene: Scene,
+        position: Union[onp.ndarray, Tuple[float, float]],
+        heading_direction: Union[onp.ndarray, Tuple[float, float]],
+        scene: JaxScene,
         return_intersection_points: Optional[bool] = False,
-    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    ) -> Union[onp.ndarray, Tuple[onp.ndarray, onp.ndarray]]:
         """Returns sensor's observation
 
         Args:
-            position (Union[np.ndarray, Tuple[float, float]]): current sensor position in world coordinates.
-            heading_direction (Union[np.ndarray, Tuple[float, float]]): sensor heading direction.
+            position (Union[onp.ndarray, Tuple[float, float]]): current sensor position in world coordinates.
+            heading_direction (Union[nop.ndarray, Tuple[float, float]]): sensor heading direction.
                 Corresponds to midpoint of FOV.
             scene (Scene): current scene
             return_intersection_points (Optional[bool], optional): If True returns both intersection
                 points and ranges. Defaults to False.
 
         Returns:
-            Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]: If return_intesection_points is False,
+            Union[onp.ndarray, Tuple[onp.ndarray, onp.ndarray]]: If return_intesection_points is False,
                 returns array of ranges, else returns tuple (range, intersection_points)
         """
-        position = np.array(position)
-        heading_angle = np.arctan2(heading_direction[1], heading_direction[0])
-        ray_angles = np.arange(
+        position = onp.array(position)
+        heading_angle = onp.arctan2(heading_direction[1], heading_direction[0])
+        ray_angles = onp.arange(
             heading_angle - self._angle_range_rad / 2,
             heading_angle + self._angle_range_rad / 2,
             self._angle_step_rad,
         )
-        ray_directions = np.concatenate(
-            [np.cos(ray_angles)[..., np.newaxis], np.sin(ray_angles)[..., np.newaxis]], axis=-1
+        ray_directions = onp.concatenate(
+            [onp.cos(ray_angles)[..., onp.newaxis], onp.sin(ray_angles)[..., onp.newaxis]], axis=-1
         )
-        segments = scene.get_polygons_segments(
-            scene.get_polygons_in_radius(position, self._distance_range)
-        )
+        segments = scene.segments
         ray_origins = position.reshape(1, -1).repeat(len(ray_directions), axis=0)
         intersection_points = batch_line_ray_intersection_point(
             ray_origins, ray_directions, segments
         )
-        ray_idx = np.arange(len(ray_directions))
-        ranges = np.linalg.norm(intersection_points - position.reshape(1, 1, -1), axis=-1)
+        intersection_points = onp.array(intersection_points)
+        ray_idx = onp.arange(len(ray_directions))
+        ranges = onp.linalg.norm(intersection_points - position.reshape(1, 1, -1), axis=-1)
         if return_intersection_points:
-            closest = np.argmin(ranges, axis=-1)
+
+            closest = onp.argmin(ranges, axis=-1)
             points = intersection_points[ray_idx, closest, :]
             ranges = ranges[ray_idx, closest]
-            points[ranges > self._distance_range] = np.array([np.inf, np.inf])
+            points[ranges > self._distance_range] = onp.array([onp.inf, onp.inf])
             ranges[ranges > self._distance_range] = self._distance_range
             return ranges, points
         ranges = ranges.min(axis=-1)
         ranges[ranges > self._distance_range] = self._distance_range
+
         return ranges
 
 
@@ -91,20 +92,20 @@ class UndirectedRangeSensor(SimpleRangeSensor):
 
     def get_observation(
         self,
-        position: Union[np.ndarray, Tuple[float, float]],
-        scene: Scene,
+        position: Union[onp.ndarray, Tuple[float, float]],
+        scene: JaxScene,
         return_intersection_points: Optional[bool] = False,
-    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    ) -> Union[onp.ndarray, Tuple[onp.ndarray, onp.ndarray]]:
         """Returns sensor's observation
 
         Args:
-            position (Union[np.ndarray, Tuple[float, float]]): current sensor position in world coordinates.
+            position (Union[onp.ndarray, Tuple[float, float]]): current sensor position in world coordinates.
             scene (Scene): current scene
             return_intersection_points (Optional[bool], optional): If True returns both intersection
                 points and ranges. Defaults to False.
 
         Returns:
-            Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]: If return_intesection_points is False,
+            Union[onp.ndarray, Tuple[onp.ndarray, onp.ndarray]]: If return_intesection_points is False,
                 returns array of ranges, else returns tuple (range, intersection_points)
         """
         return super().get_observation(position, (1, 0), scene, return_intersection_points)

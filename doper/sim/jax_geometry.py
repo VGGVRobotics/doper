@@ -81,6 +81,90 @@ def find_closest_segment_to_point(
     return segments_batch[closest_idx], distances[closest_idx]
 
 
+def line_ray_intersection_point(
+    ray_origin: np.ndarray, ray_direction: np.ndarray, segment: np.ndarray
+) -> np.ndarray:
+    """Function to check intersection between ray and segment.
+
+    See algorithm description here  http://bit.ly/1CoxdrG
+
+    Args:
+        ray_origin (np.ndarray): (2,) ray origin point
+        ray_direction (np.ndarray): (2,) ray direction vector, can be unnormalized
+        segments (np.ndarray): (2, 2) segment to check intersection with
+
+    Returns:
+        np.ndarray: (2,) intersection point
+    """
+
+    ray_direction = ray_direction / np.linalg.norm(ray_direction)
+    v1 = ray_origin - segment[0]
+    v2 = segment[1] - segment[0]
+    v3 = np.array([-ray_direction[1], ray_direction[0]])
+    denom = v2 @ v3
+
+    def compute_intersection_point(denom):
+        t1 = np.cross(v2, v1) / denom
+        t2 = (v1 @ v3) / denom
+        condition = np.logical_or(np.logical_or(t1 < 0.0, t2 < 0.0), t2 > 1.0)
+        return jax.lax.cond(
+            condition,
+            true_fun=lambda t: np.array([np.inf, np.inf]),
+            false_fun=lambda t: ray_origin + t1 * ray_direction,
+            operand=t1,
+        )
+
+    return jax.lax.cond(
+        denom == 0,
+        true_fun=lambda d: np.array([np.inf, np.inf]),
+        false_fun=compute_intersection_point,
+        operand=denom,
+    )
+
+
+def _unpack_and_apply_lrip(batch_element: np.ndarray) -> np.ndarray:
+    """Unpacks batched line ray intersection task and applies lrip function
+
+    Args:
+        batch_element (np.ndarray): (n_seg * n_rays, 4, 2) batch of tasks
+
+    Returns:
+        np.ndarray: (n_seg * n_rays, 2) batch of intersection points
+    """
+    ray_origin, ray_direction, segment = batch_element[0], batch_element[1], batch_element[2:]
+    return line_ray_intersection_point(ray_origin, ray_direction, segment)
+
+
+_lrip_with_unpack_map = jax.vmap(_unpack_and_apply_lrip, 0)
+
+
+@jax.jit
+def batch_line_ray_intersection_point(
+    ray_origins: np.ndarray, ray_directions: np.ndarray, segments: np.ndarray
+) -> np.ndarray:
+    """Function to check intersection between multiple rays and multiple segments.
+    See algorithm description here  http://bit.ly/1CoxdrG
+    Args:
+        ray_origins (np.ndarray): (n_rays, 2) array of ray origin points
+        ray_directions (np.ndarray): (n_rays, 2) array of ray directions, may not
+            be normalized
+        segments (np.ndarray): (n_segments, 2, 2) array of segments endpoints
+    Returns:
+        np.ndarray: (n_rays, n_segments, 2) array of segment intersection points.
+                    Contains np.inf if ray does not intersect the segment.
+    """
+    ray_origins = np.repeat(np.expand_dims(ray_origins, 1), segments.shape[0], 1)
+    ray_directions = np.repeat(np.expand_dims(ray_directions, 1), segments.shape[0], 1)
+    segments = np.repeat(np.expand_dims(segments, 0), ray_origins.shape[0], 0)
+    ray_origins = np.expand_dims(ray_origins, 2)
+    ray_directions = np.expand_dims(ray_directions, 2)
+    # (n_rays, n_segments, 4, 2)
+    batch = np.concatenate([ray_origins, ray_directions, segments], axis=2)
+    batch = batch.reshape(-1, 4, 2)
+    points_batch = _lrip_with_unpack_map(batch)
+    return points_batch.reshape(ray_origins.shape[0], segments.shape[1], -1)
+
+
 def rotate_polygon(polygon: Polygon, angle: float, center: Tuple[float, float]) -> None:
     """Rotates the polygon around center.
 
