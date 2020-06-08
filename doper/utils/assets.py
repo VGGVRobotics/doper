@@ -32,7 +32,6 @@ def sort_segments(segments: onp.ndarray, orientation: str) -> onp.ndarray:
         segments (np.ndarray): segments to sort
         orientation (str): sorting order, either clockwise or counterclockwise
     """
-    print(segments.shape)
     idxs = onp.arange(len(segments))
     remaining_idxs = set(idxs)
     order = []

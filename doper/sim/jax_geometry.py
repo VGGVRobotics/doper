@@ -9,6 +9,22 @@ Polygon = namedtuple("Polygon", ["segments"])
 JaxScene = namedtuple("JaxScene", ["segments", "polygons"])
 
 
+def _compute_segment_normal(segment: np.ndarray) -> np.ndarray:
+    """Computes normal direction for the segment
+
+    Args:
+        segment (np.ndarray): segment to compute normal direction for
+
+    Returns:
+        np.ndarray: normal direction vector
+    """
+    segment_vector = segment[1] - segment[0]
+    midpoint = (segment[0] + segment[1]) / 2
+    normal = np.array([segment_vector[1], -segment_vector[0]])
+    normal = normal + midpoint
+    return normal
+
+
 def compute_segment_normal_projection(point: np.ndarray, segment: np.ndarray) -> np.ndarray:
     """Computes projection of point to the polygon segment normal
 
@@ -19,9 +35,45 @@ def compute_segment_normal_projection(point: np.ndarray, segment: np.ndarray) ->
     Returns:
         np.ndarray: normal projection
     """
-    normal = np.concatenate([segment[1], -segment[0]])
-    normal = normal / np.linalg.norm(normal)
+    normal = _compute_segment_normal(segment)
     return np.dot(point, normal) * normal
+
+
+def compute_segment_normal_projection_sign(point: np.ndarray, segment: np.ndarray) -> np.ndarray:
+    """Computes sign of projection on segment's normal direction
+    Args:
+        point (np.ndarray): point being projected on the normal
+        segment (np.ndarray): segment to project to
+
+    Returns:
+        np.ndarray: sign of projection
+    """
+    normal = _compute_segment_normal(segment)
+    return np.dot(point, normal)
+
+
+multi_segments_normal_projection_sign = jax.vmap(compute_segment_normal_projection_sign, (None, 0))
+
+
+# slow without jit, slow compilation with jit if too many polygons (> 10 i think)
+# no simple workaround except do it numba instead of jax
+def if_point_inside_any_polygon(point: np.ndarray, scene: JaxScene) -> np.ndarray:
+    """Checks if point is inside any polygon
+
+    Args:
+        point (np.ndarray): point to check
+        scene (JaxScene): scene instance
+
+    Returns:
+        np.ndarray: bool result
+    """
+    result = False
+    for poly in scene.polygons:
+        signs = multi_segments_normal_projection_sign(point, poly.segments)
+        print(signs)
+        is_inside = np.all(signs < 0)
+        result = result | is_inside
+    return result
 
 
 def compute_segment_projection(

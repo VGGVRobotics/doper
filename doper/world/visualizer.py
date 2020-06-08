@@ -38,7 +38,16 @@ class TaichiRenderer:
             for i in range(len(poly.segments)):
                 segment = poly.segments[i].copy()
                 segment = segment / self._window_size_meters
+                segment_vector = segment[1] - segment[0]
+                normal = np.array([segment_vector[1], -segment_vector[0]])
+                normal = normal / np.linalg.norm(normal) / self._window_size_meters
+
                 self._gui.line(segment[1], segment[0], color=0xFF00FF)
+                self._gui.line(
+                    segment[0] + segment_vector / 2,
+                    segment[0] + segment_vector / 2 + normal,
+                    color=0xFF00FF,
+                )
 
     def _render_sensor(
         self,
