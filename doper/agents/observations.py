@@ -1,6 +1,5 @@
 from typing import Tuple, Union, Optional
 import numpy as onp
-import jax.numpy as np
 from doper.sim.jax_geometry import JaxScene, batch_line_ray_intersection_point
 
 

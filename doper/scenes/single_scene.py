@@ -23,5 +23,11 @@ class SingleScene:
         Returns:
             [batch_size, 2] jax array with initial coordinates
         """
-        proposal = onp.random.uniform((-4.0, -4.0), (16.0, 0.0), size=(batch_size, 2))
+        onp_segments = onp.asarray(self.jax_scene.segments)
+        max_x, min_x = onp.max(onp_segments[:, :, 0]), onp.min(onp_segments[:, :, 0])
+        max_y, min_y = onp.max(onp_segments[:, :, 1]), onp.min(onp_segments[:, :, 1])
+        proposal = onp.random.uniform(
+            (min_x - 1, max_x + 1), (min_y - 1, max_y + 1), size=(batch_size, 2)
+        )
+
         return np.array(proposal)

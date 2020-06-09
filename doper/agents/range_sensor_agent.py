@@ -2,7 +2,7 @@ __all__ = ["RangeSensingAgent"]
 
 import numpy as onp
 
-from doper.world.observations import UndirectedRangeSensor
+from .observations import UndirectedRangeSensor
 from doper.utils.connectors import input_to_pytorch
 
 
@@ -15,10 +15,7 @@ class RangeSensingAgent:
         )
 
     def get_observations(
-        self,
-        coordinate_init: onp.ndarray,
-        velocity_init: onp.ndarray,
-        scene_handler: object,
+        self, coordinate_init: onp.ndarray, velocity_init: onp.ndarray, scene_handler: object,
     ):
         """
         Returns an observation given the current agents state

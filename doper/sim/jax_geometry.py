@@ -19,9 +19,8 @@ def _compute_segment_normal(segment: np.ndarray) -> np.ndarray:
         np.ndarray: normal direction vector
     """
     segment_vector = segment[1] - segment[0]
-    midpoint = (segment[0] + segment[1]) / 2
     normal = np.array([segment_vector[1], -segment_vector[0]])
-    normal = normal + midpoint
+    normal = normal / np.linalg.norm(normal)
     return normal
 
 
@@ -49,7 +48,8 @@ def compute_segment_normal_projection_sign(point: np.ndarray, segment: np.ndarra
         np.ndarray: sign of projection
     """
     normal = _compute_segment_normal(segment)
-    return np.dot(point, normal)
+    point_vector = point - segment[0]
+    return np.sign(np.dot(point_vector, normal))
 
 
 multi_segments_normal_projection_sign = jax.vmap(compute_segment_normal_projection_sign, (None, 0))
@@ -70,7 +70,6 @@ def if_point_inside_any_polygon(point: np.ndarray, scene: JaxScene) -> np.ndarra
     result = False
     for poly in scene.polygons:
         signs = multi_segments_normal_projection_sign(point, poly.segments)
-        print(signs)
         is_inside = np.all(signs < 0)
         result = result | is_inside
     return result
