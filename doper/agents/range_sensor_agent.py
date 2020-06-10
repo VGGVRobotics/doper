@@ -33,7 +33,7 @@ class RangeSensingAgent:
         ).reshape(-1, 1)
         direction = (coordinate_init - onp.array(self.config["sim"]["coordinate_target"])) / dist
         range_obs = [
-            self.sensor.get_observation(position=coord, scene=scene_handler.scene)
+            self.sensor.get_observation(position=coord, scene=scene_handler.jax_scene)
             for coord in coordinate_init
         ]
         range_obs = onp.stack(range_obs, axis=0)

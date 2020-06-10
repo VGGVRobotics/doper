@@ -5,7 +5,9 @@ import matplotlib.pyplot as plt
 from matplotlib import collections as mc
 
 
-def write_output(trajectory: onp.ndarray, output_file_name: os.PathLike, scene_handler: object, config: dict):
+def write_output(
+    trajectory: onp.ndarray, output_file_name: os.PathLike, scene_handler: object, config: dict
+):
     """
     Writes images with trajectories and scene
     Args:
@@ -14,7 +16,7 @@ def write_output(trajectory: onp.ndarray, output_file_name: os.PathLike, scene_h
         scene_handler: scene handler object, containing the scene
         config: configuration dict
     """
-    lines = mc.LineCollection(scene_handler.scene.get_all_segments())
+    lines = mc.LineCollection(onp.array(scene_handler.jax_scene.segments))
     fig, ax = plt.subplots()
 
     ax.add_collection(lines)

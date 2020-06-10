@@ -6,7 +6,7 @@ import jax
 import jax.numpy as np
 
 Polygon = namedtuple("Polygon", ["segments"])
-JaxScene = namedtuple("JaxScene", ["segments", "polygons"])
+JaxScene = namedtuple("JaxScene", ["segments", "polygons", "polygon_ranges"])
 
 
 def _compute_segment_normal(segment: np.ndarray) -> np.ndarray:
@@ -52,26 +52,66 @@ def compute_segment_normal_projection_sign(point: np.ndarray, segment: np.ndarra
     return np.sign(np.dot(point_vector, normal))
 
 
-multi_segments_normal_projection_sign = jax.vmap(compute_segment_normal_projection_sign, (None, 0))
+def _unpack_and_apply_nps(batch_element: np.ndarray) -> np.ndarray:
+    """Unpacks batch for cartesian map of compute_segment_normal_projection sign
+
+    Args:
+        batch_element (np.ndarray): single batch element
+
+    Returns:
+        np.ndarray: normal projection sign
+    """
+    point, segment = batch_element[0], batch_element[1:]
+    return compute_segment_normal_projection_sign(point, segment)
+
+
+_batch_unpack_and_apply_nps = jax.vmap(_unpack_and_apply_nps)
+
+
+def batch_segment_normal_projection_sign(points: np.ndarray, segments: np.ndarray) -> np.ndarray:
+    """Batched version of compute_segment_normal_projection_sign
+
+    Args:
+        points (np.ndarray): points batch
+        segments (np.ndarray): segments batch
+
+    Returns:
+        np.ndarray: (n_points, n_segments) array of normal projection signs
+    """
+
+    # TODO: may be we can somehow generalize packing and unpacking for cartesian map
+    # i.e. map of two arrays with shapes (N, ...) and (M, ...) and result with shape (N, M)
+    points = np.repeat(np.expand_dims(points, 1), segments.shape[0], 1)
+    segments = np.repeat(np.expand_dims(segments, 0), points.shape[0], 0)
+    points = np.expand_dims(points, 2)
+    # (n_points, n_segments, 3, 2)
+    batch = np.concatenate([points, segments], axis=2)
+    batch = batch.reshape(-1, 3, 2)
+    signs_batch = _batch_unpack_and_apply_nps(batch)
+    return signs_batch.reshape(points.shape[0], segments.shape[1])
 
 
 # slow without jit, slow compilation with jit if too many polygons (> 10 i think)
-# no simple workaround except do it numba instead of jax
-def if_point_inside_any_polygon(point: np.ndarray, scene: JaxScene) -> np.ndarray:
-    """Checks if point is inside any polygon
+# no simple workaround except do it in numba instead of jax
+def if_points_inside_any_polygon(points: np.ndarray, scene: JaxScene) -> np.ndarray:
+    """Checks if points is inside any polygon
 
     Args:
-        point (np.ndarray): point to check
+        points (np.ndarray): point or batch of points to check
         scene (JaxScene): scene instance
 
     Returns:
         np.ndarray: bool result
     """
-    result = False
-    for poly in scene.polygons:
-        signs = multi_segments_normal_projection_sign(point, poly.segments)
-        is_inside = np.all(signs < 0)
-        result = result | is_inside
+
+    if points.ndim == 1:
+        points = points.reshape(1, -1)
+    result = np.zeros(len(points)).astype(bool)
+    signs = batch_segment_normal_projection_sign(points, scene.segments)
+    signs = signs < 0
+    for start, end in scene.polygon_ranges:
+        is_inside = np.all(signs[:, start:end], axis=-1)
+        result = np.logical_or(is_inside, result)
     return result
 
 
@@ -130,6 +170,9 @@ def find_closest_segment_to_point(
     distances = compute_distance_to_segments_batch(point, segments_batch)
     closest_idx = np.argmin(distances)
     return segments_batch[closest_idx], distances[closest_idx]
+
+
+find_closest_segment_to_points_batch = jax.vmap(find_closest_segment_to_point, (0, None), 0)
 
 
 def line_ray_intersection_point(
@@ -255,6 +298,14 @@ def create_polygon(
 
 
 def create_scene(polygons: List[Polygon]) -> JaxScene:
+    polygon_ranges = onp.zeros((len(polygons), 2), dtype=np.int32)
+    start = 0
+    for i, poly in enumerate(polygons):
+        polygon_ranges[i, 0] = start
+        polygon_ranges[i, 1] = start + len(poly.segments)
+        start += len(poly.segments)
     return JaxScene(
-        polygons=polygons, segments=np.concatenate([p.segments for p in polygons], axis=0)
+        polygons=polygons,
+        segments=np.concatenate([p.segments for p in polygons], axis=0),
+        polygon_ranges=np.array(polygon_ranges),
     )

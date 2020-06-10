@@ -7,7 +7,7 @@ import numpy as onp
 from doper.sim.jax_geometry import (
     if_point_inside_any_polygon,
     JaxScene,
-    find_closest_segment_to_point,
+    find_closest_segment_to_points_batch,
 )
 
 
@@ -16,15 +16,13 @@ if __name__ == "__main__":
     is_inside = []
     scene = get_svg_scene("../assets/simple_level.svg", px_per_meter=50)
     # scene = JaxScene(segments=scene.segments, polygons=scene.polygons, polygon_ranges)
+    points = onp.random.uniform((0, 7.0), (16.0, 0.0), size=(100, 2))
     for _ in range(100):
-        point = onp.random.uniform((0, 7.0), (16.0, 0.0), size=(2,))
-        points.append(point)
         start = time()
-        result = if_point_inside_any_polygon(point, scene)
-        _, d = find_closest_segment_to_point(point, scene.segments)
-        if d < 0.2:
-            result = True
-        is_inside.append(result)
+        result = if_point_inside_any_polygon(points, scene)
+        _, d = find_closest_segment_to_points_batch(points, scene.segments)
+        d = d < 0.2
+        is_inside = onp.logical_or(d, result)
         print(result, time() - start)
     lines = mc.LineCollection(scene.segments)
     fig, ax = plt.subplots()

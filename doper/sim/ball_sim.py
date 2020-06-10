@@ -7,9 +7,7 @@ import jax.numpy as np
 from jax import grad
 from jax import lax
 
-from doper.world.scene import Scene
-from doper.world.shapes import Polygon
-from .jax_geometry import find_closest_segment_to_point, compute_segment_projection
+from .jax_geometry import find_closest_segment_to_point, compute_segment_projection, JaxScene
 
 BallState = namedtuple("BallState", ["coordinate", "velocity", "acceleration"])
 
@@ -138,7 +136,7 @@ def collide(
     current_state: BallState,
     new_state: BallState,
     attractor: Sequence,
-    closest_segment: Polygon,
+    closest_segment: np.ndarray,
     distance: float,
     constants: dict,
     dt: float,
@@ -173,7 +171,7 @@ def collide(
 def sim_step(
     current_state: BallState,
     t: float,
-    scene: Scene,
+    scene: JaxScene,
     attractor: Sequence,
     constants: dict,
     dt: float,
@@ -183,7 +181,7 @@ def sim_step(
     Args:
         current_state: named tuple BallState with the current state
         t: fake variable needed for lax.scan
-        scene: Scene object with scene geometry
+        scene: JaxScene object with scene geometry
         attractor: jax array with L2 attractor coordinate
         constants: dict with physical constants
         dt: time step
@@ -214,7 +212,7 @@ def sim_step(
 def _run_sim(
     sim_time: Union[float, int],
     n_steps: int,
-    scene: Scene,
+    scene: JaxScene,
     coordinate_init: Sequence,
     velocity_init: Sequence,
     attractor: Sequence,
@@ -225,7 +223,7 @@ def _run_sim(
     Args:
         sim_time: Time in seconds per simulation
         n_steps: Number of steps per simulation
-        scene: Scene object with scene geometry
+        scene: JaxScene object with scene geometry
         coordinate_init: jax array with initial agents coordinate
         velocity_init: jax array with initial agents velocity
         attractor: jax array with attractor coordinates
@@ -258,7 +256,7 @@ def _run_sim(
 def _compute_loss(
     sim_time: Union[float, int],
     n_steps: int,
-    scene: Scene,
+    scene: JaxScene,
     coordinate_init: Sequence,
     velocity_init: Sequence,
     target_coordinate: Sequence,
@@ -270,7 +268,7 @@ def _compute_loss(
     Args:
         sim_time: Time in seconds per simulation
         n_steps: Number of steps per simulation
-        scene: Scene object with scene geometry
+        scene: JaxScene object with scene geometry
         coordinate_init: jax array with initial agents coordinate
         velocity_init: jax array with initial agents velocity
         target_coordinate: jax array with the target for the agent
@@ -291,7 +289,7 @@ def _compute_loss(
 def reduce_loss(
     sim_time: Union[float, int],
     n_steps: int,
-    scene: Scene,
+    scene: JaxScene,
     coordinate_init: Sequence,
     velocity_init: Sequence,
     target_coordinate: Sequence,
@@ -303,7 +301,7 @@ def reduce_loss(
     Args:
         sim_time: Time in seconds per simulation
         n_steps: Number of steps per simulation
-        scene: Scene object with scene geometry
+        scene: JaxScene object with scene geometry
         coordinate_init: jax array with initial agents coordinate
         velocity_init: jax array with initial agents velocity
         target_coordinate: jax array with the target for the agent
@@ -313,7 +311,16 @@ def reduce_loss(
     Returns:
         Single float loss for gradient and tuple with auxilary values
     """
-    loss_out = vmapped_loss(sim_time, n_steps, scene, coordinate_init, velocity_init, target_coordinate, attractor, constants)
+    loss_out = vmapped_loss(
+        sim_time,
+        n_steps,
+        scene,
+        coordinate_init,
+        velocity_init,
+        target_coordinate,
+        attractor,
+        constants,
+    )
     return np.sum(loss_out[0]), loss_out[1:]
 
 
