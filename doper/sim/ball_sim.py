@@ -136,7 +136,7 @@ def collide(
     current_state: BallState,
     new_state: BallState,
     attractor: Sequence,
-    closest_segment: np.ndarray,
+    closest_segment: jax.numpy.ndarray,
     distance: float,
     constants: dict,
     dt: float,

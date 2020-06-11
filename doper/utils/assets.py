@@ -29,7 +29,7 @@ def sort_segments(segments: onp.ndarray, orientation: str) -> onp.ndarray:
     """Sorts segments and endpoints in counterclockwise or clockwise order
 
     Args:
-        segments (np.ndarray): segments to sort
+        segments (onp.ndarray): segments to sort
         orientation (str): sorting order, either clockwise or counterclockwise
     """
     idxs = onp.arange(len(segments))

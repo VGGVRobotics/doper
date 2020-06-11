@@ -24,7 +24,7 @@ def _compute_segment_normal(segment: np.ndarray) -> np.ndarray:
     return normal
 
 
-def compute_segment_normal_projection(point: np.ndarray, segment: np.ndarray) -> np.ndarray:
+def compute_segment_normal_projection(point: jax.numpy.ndarray, segment: np.ndarray) -> np.ndarray:
     """Computes projection of point to the polygon segment normal
 
     Args:
