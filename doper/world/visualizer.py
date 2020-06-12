@@ -2,13 +2,13 @@ from typing import Tuple, Union
 import taichi as ti
 import numpy as np
 
-from .scene import Scene
+from doper.sim.jax_geometry import JaxScene
 
 
 class TaichiRenderer:
     def __init__(
         self,
-        scene: Scene,
+        scene: JaxScene,
         window_size_meters: Tuple[int, int] = (12, 9),
         frustrum_left_corner: Tuple[float, float] = (0, 0),
         px_per_meter: float = 50,
@@ -34,17 +34,20 @@ class TaichiRenderer:
     def _render_scene(self) -> None:
         """Renders scene geometry
         """
-        for poly in self._scene.get_polygons_in_area(
-            self._frustrum_left_corner, self._frustrum_left_corner + self._window_size_meters
-        ):
+        for poly in self._scene.polygons:
             for i in range(len(poly.segments)):
                 segment = poly.segments[i].copy()
-                normal = poly.normals[i].copy()
                 segment = segment / self._window_size_meters
-                normal = normal / self._window_size_meters
-                midpoint = (segment[1] + segment[0]) / 2
+                segment_vector = segment[1] - segment[0]
+                normal = np.array([segment_vector[1], -segment_vector[0]])
+                normal = normal / np.linalg.norm(normal) / self._window_size_meters
+
                 self._gui.line(segment[1], segment[0], color=0xFF00FF)
-                self._gui.line(midpoint, midpoint + normal)
+                self._gui.line(
+                    segment[0] + segment_vector / 2,
+                    segment[0] + segment_vector / 2 + normal,
+                    color=0xFF00FF,
+                )
 
     def _render_sensor(
         self,
