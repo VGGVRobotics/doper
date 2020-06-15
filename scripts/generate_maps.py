@@ -23,8 +23,9 @@ min_field = -10.
 max_field = 10.
 output_folder = '../assets/generated/'
 os.makedirs(output_folder, exist_ok=True)
-num_maps = 50
+num_maps = 4
 px_per_meter = 50
+num_processes = 4
 
 def generate_maps(map_id):
     map_file = os.path.join(output_folder, f"map_{map_id}.svg")
@@ -88,5 +89,5 @@ def generate_maps(map_id):
 
 
 if __name__ == '__main__':
-    with Pool(4) as pool:
+    with Pool(num_processes) as pool:
         pool.map(generate_maps, range(num_maps))
