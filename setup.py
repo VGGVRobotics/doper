@@ -16,5 +16,6 @@ setup(
         "svgpathtools==1.3.3",
         "matplotlib",
         "pyyaml",
+        "tripy",
     ],
 )

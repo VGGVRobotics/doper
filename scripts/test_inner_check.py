@@ -5,30 +5,32 @@ from matplotlib import collections as mc
 import jax
 import numpy as onp
 from doper.sim.jax_geometry import (
-    if_point_inside_any_polygon,
+    if_points_inside_any_polygon,
     JaxScene,
     find_closest_segment_to_points_batch,
 )
 
 
 if __name__ == "__main__":
-    points = []
-    is_inside = []
-    scene = get_svg_scene("../assets/simple_level.svg", px_per_meter=50)
+
+    scene = get_svg_scene("assets/map_40.svg", px_per_meter=50)
     # scene = JaxScene(segments=scene.segments, polygons=scene.polygons, polygon_ranges)
-    points = onp.random.uniform((0, 7.0), (16.0, 0.0), size=(100, 2))
-    for _ in range(100):
+    onp_segments = onp.asarray(scene.segments)
+    max_x, min_x = onp.max(onp_segments[:, :, 0]), onp.min(onp_segments[:, :, 0])
+    max_y, min_y = onp.max(onp_segments[:, :, 1]), onp.min(onp_segments[:, :, 1])
+    for i in range(10):
+        proposal = onp.random.uniform((min_x, min_y), (max_x, max_y), size=(100, 2))
         start = time()
-        result = if_point_inside_any_polygon(points, scene)
-        _, d = find_closest_segment_to_points_batch(points, scene.segments)
-        d = d < 0.2
-        is_inside = onp.logical_or(d, result)
-        print(result, time() - start)
+        proposal = jax.numpy.array(proposal)
+        is_inner = if_points_inside_any_polygon(proposal, scene)
+        _, distance = find_closest_segment_to_points_batch(proposal, scene.segments)
+        acceptable = onp.logical_not(is_inner)
+        print(time() - start)
     lines = mc.LineCollection(scene.segments)
     fig, ax = plt.subplots()
     ax.add_collection(lines)
-    outer = [points[i] for i in range(len(points)) if not is_inside[i]]
-    inner = [points[i] for i in range(len(points)) if is_inside[i]]
+    outer = [proposal[i] for i in range(len(proposal)) if acceptable[i]]
+    inner = [proposal[i] for i in range(len(proposal)) if not acceptable[i]]
     ax.scatter([p[0] for p in outer], [p[1] for p in outer], color="b")
     ax.scatter([p[0] for p in inner], [p[1] for p in inner], color="r")
     fig.legend()
