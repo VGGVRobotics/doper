@@ -1,9 +1,11 @@
+import argparse
 import os
 import time
+from multiprocessing import Pool
 
 import numpy as onp
 from svgpathtools import Line, Path, wsvg
-from multiprocessing import Pool
+
 
 def self_intersects(line, lines):
     for l in lines:
@@ -14,18 +16,6 @@ def self_intersects(line, lines):
             return True
     return False
 
-
-min_num_figures = 2
-max_num_figures = 13
-min_edge = .1
-max_edge = 5.
-min_field = -10.
-max_field = 10.
-output_folder = '../assets/generated/'
-os.makedirs(output_folder, exist_ok=True)
-num_maps = 4
-px_per_meter = 50
-num_processes = 4
 
 def generate_maps(map_id):
     map_file = os.path.join(output_folder, f"map_{map_id}.svg")
@@ -54,8 +44,6 @@ def generate_maps(map_id):
             if len(lines) == 0 or not self_intersects(line, all_lines):
                 lines.append(line)
                 all_lines.append(line)
-            else:
-                pass
 
         final_line = Line(lines[-1].end, lines[0].start)
         extra_line = None
@@ -89,5 +77,40 @@ def generate_maps(map_id):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output-folder", type=str, default='../assets/generated/',
+                        help="where to save generated maps")
+    parser.add_argument("--min-num-figures", type=int, default=2,
+                        help="minimum number of figures per scene")
+    parser.add_argument("--max-num-figures", type=int, default=14,
+                        help="maximum number of figures per scene")
+    parser.add_argument("--min-edge", type=float, default=0.1,
+                        help="minimum edge length")
+    parser.add_argument("--max-edge", type=float, default=5.,
+                        help="maximum edge length")
+    parser.add_argument("--min-field", type=float, default=-10.,
+                        help="minimum coordinate for sampling")  # single number as in square
+    parser.add_argument("--max-field", type=float, default=10.,
+                        help="maximum coordinate for sampling")  # single number as in square
+    parser.add_argument("--num-maps", type=int, default=50,
+                        help="number of maps to generate")
+    parser.add_argument("--px-per-meter", type=int, default=1,
+                        help="px per meter (tested with 1)")
+    parser.add_argument("--num-processes", type=int, default=4,
+                        help="number of cores to use")
+    args = parser.parse_args()
+
+    min_num_figures = args.min_num_figures
+    max_num_figures = args.max_num_figures
+    min_edge = args.min_edge
+    max_edge = args.max_edge
+    min_field = args.min_field
+    max_field = args.max_field
+    output_folder = args.output_folder
+    num_maps = args.num_maps
+    px_per_meter = args.px_per_meter
+    num_processes = args.num_processes
+    os.makedirs(output_folder, exist_ok=True)
+
     with Pool(num_processes) as pool:
         pool.map(generate_maps, range(num_maps))
