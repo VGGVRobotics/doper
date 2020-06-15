@@ -33,21 +33,31 @@ class MultipleScenes:
             [batch_size, 2] jax array with initial coordinates
         """
         self.jax_scene = self.jax_scenes[onp.random.randint(0, len(self.jax_scenes), 1)[0]]
-        eps = 0.05
-        onp_segments = onp.asarray(self.jax_scene.segments)
-        max_x, min_x = onp.max(onp_segments[:, :, 0]), onp.min(onp_segments[:, :, 0])
-        max_y, min_y = onp.max(onp_segments[:, :, 1]), onp.min(onp_segments[:, :, 1])
+        eps = self.config["constants"]["radius"] / 2
+
+        max_x, min_x = onp.max(self._onp_segments[:, :, 0]), onp.min(self._onp_segments[:, :, 0])
+        max_y, min_y = onp.max(self._onp_segments[:, :, 1]), onp.min(self._onp_segments[:, :, 1])
+        remaining_idxs = np.arange(batch_size)
+        init_proposal = onp.random.uniform(
+            (min_x - 1, min_y - 1), (max_x + 1, max_y + 1), size=(batch_size, 2)
+        )
+        proposal_jax = np.asarray(init_proposal)
         while True:
-            proposal = onp.random.uniform(
-                (min_x - 2, max_x + 2), (min_y - 2, max_y + 2), size=(batch_size, 2)
+            is_inner = if_points_inside_any_polygon(proposal_jax, self.jax_scene)
+            _, distance = find_closest_segment_to_points_batch(
+                proposal_jax, self.jax_scene.segments
             )
-            proposal = np.array(proposal)
-            is_inner = if_points_inside_any_polygon(proposal, self.jax_scene)
-            _, distance = find_closest_segment_to_points_batch(proposal, self.jax_scene.segments)
-            acceptable = np.logical_not(
-                np.logical_or(is_inner, distance <= self.config["constants"]["radius"] + eps)
+            acceptable = onp.asarray(
+                np.logical_not(
+                    np.logical_or(is_inner, distance <= self.config["constants"]["radius"] + eps)
+                )
             )
+            init_proposal[remaining_idxs[acceptable], :] = onp.array(proposal_jax)[acceptable, :]
             if np.all(acceptable):
                 break
             logger.debug("Resampling starting position")
-        return np.array(proposal)
+            remaining_idxs = remaining_idxs[np.logical_not(acceptable)]
+            proposal_jax = np.asarray(
+                onp.random.uniform((min_x, min_y), (max_x, max_y), size=(len(remaining_idxs), 2))
+            )
+        return np.array(init_proposal)
