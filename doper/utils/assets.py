@@ -114,7 +114,6 @@ def get_svg_scene(fname: str, px_per_meter: float = 50) -> JaxScene:
         # triangulate:
         polygon_points = [s[0] for s in onp_polygon]
         triangles_points = tripy.earclip(polygon_points)
-        # print(triangles_points)
         idxs = onp.array([0, 1, 2])
         for triangle in triangles_points:
             segments = onp.zeros((3, 2, 2), dtype=onp_polygon.dtype)
