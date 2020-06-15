@@ -17,7 +17,11 @@ logger = logging.getLogger(__name__)
 class MultipleScenes:
     def __init__(self, config: dict):
         self.config = config
-        self.scenes = glob(config["sim"]["scene_params"]["svg_scene_path"])
+        scene_paths = glob(config["sim"]["scene_params"]["svg_scene_path"])
+        self.jax_scenes = [
+            get_svg_scene(scene, 
+            px_per_meter=self.config["sim"]["scene_params"]["px_per_meter"],
+            ) for scene in scene_paths]
 
     def get_init_state(self, batch_size: int):
         """
@@ -28,10 +32,7 @@ class MultipleScenes:
         Returns:
             [batch_size, 2] jax array with initial coordinates
         """
-        self.jax_scene = get_svg_scene(
-            self.scenes[onp.random.randint(0, len(self.scenes), 1)[0]],
-            px_per_meter=self.config["sim"]["scene_params"]["px_per_meter"],
-        )
+        self.jax_scene = self.jax_scenes[onp.random.randint(0, len(self.jax_scenes), 1)[0]]
         eps = 0.05
         onp_segments = onp.asarray(self.jax_scene.segments)
         max_x, min_x = onp.max(onp_segments[:, :, 0]), onp.min(onp_segments[:, :, 0])
