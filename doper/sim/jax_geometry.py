@@ -6,7 +6,7 @@ import jax
 import jax.numpy as np
 
 Polygon = namedtuple("Polygon", ["segments"])
-JaxScene = namedtuple("JaxScene", ["segments", "polygons", "polygon_ranges"])
+JaxScene = namedtuple("JaxScene", ["segments", "polygons"])
 
 
 def _compute_segment_normal(segment: np.ndarray) -> np.ndarray:
@@ -38,6 +38,7 @@ def compute_segment_normal_projection(point: jax.numpy.ndarray, segment: np.ndar
     return np.dot(point, normal) * normal
 
 
+@jax.jit
 def compute_segment_normal_projection_sign(point: np.ndarray, segment: np.ndarray) -> np.ndarray:
     """Computes sign of projection on segment's normal direction
     Args:
@@ -52,6 +53,7 @@ def compute_segment_normal_projection_sign(point: np.ndarray, segment: np.ndarra
     return np.sign(np.dot(point_vector, normal))
 
 
+@jax.jit
 def _unpack_and_apply_nps(batch_element: np.ndarray) -> np.ndarray:
     """Unpacks batch for cartesian map of compute_segment_normal_projection sign
 
@@ -68,6 +70,7 @@ def _unpack_and_apply_nps(batch_element: np.ndarray) -> np.ndarray:
 _batch_unpack_and_apply_nps = jax.vmap(_unpack_and_apply_nps)
 
 
+@jax.jit
 def batch_segment_normal_projection_sign(points: np.ndarray, segments: np.ndarray) -> np.ndarray:
     """Batched version of compute_segment_normal_projection_sign
 
@@ -91,8 +94,7 @@ def batch_segment_normal_projection_sign(points: np.ndarray, segments: np.ndarra
     return signs_batch.reshape(points.shape[0], segments.shape[1])
 
 
-# slow without jit, slow compilation with jit if too many polygons (> 10 i think)
-# no simple workaround except do it in numba instead of jax
+@jax.jit
 def if_points_inside_any_polygon(points: np.ndarray, scene: JaxScene) -> np.ndarray:
     """Checks if points is inside any polygon
 
@@ -106,12 +108,11 @@ def if_points_inside_any_polygon(points: np.ndarray, scene: JaxScene) -> np.ndar
 
     if points.ndim == 1:
         points = points.reshape(1, -1)
-    result = np.zeros(len(points)).astype(bool)
     signs = batch_segment_normal_projection_sign(points, scene.segments)
     signs = signs < 0
-    for start, end in scene.polygon_ranges:
-        is_inside = np.all(signs[:, start:end], axis=-1)
-        result = np.logical_or(is_inside, result)
+    signs = signs.reshape(len(points), len(scene.polygons), 3)  # all polygons have 3 segments
+    is_inside = np.all(signs, axis=-1)
+    result = np.any(is_inside, axis=-1)
     return result
 
 
@@ -155,6 +156,7 @@ def compute_distance_to_segment(point: np.ndarray, segment: np.ndarray) -> np.nd
 compute_distance_to_segments_batch = jax.vmap(compute_distance_to_segment, (None, 0), 0)
 
 
+@jax.jit
 def find_closest_segment_to_point(
     point: np.ndarray, segments_batch: np.ndarray
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -298,14 +300,6 @@ def create_polygon(
 
 
 def create_scene(polygons: List[Polygon]) -> JaxScene:
-    polygon_ranges = onp.zeros((len(polygons), 2), dtype=np.int32)
-    start = 0
-    for i, poly in enumerate(polygons):
-        polygon_ranges[i, 0] = start
-        polygon_ranges[i, 1] = start + len(poly.segments)
-        start += len(poly.segments)
     return JaxScene(
-        polygons=polygons,
-        segments=np.concatenate([p.segments for p in polygons], axis=0),
-        polygon_ranges=np.array(polygon_ranges),
+        polygons=polygons, segments=np.concatenate([p.segments for p in polygons], axis=0),
     )

@@ -3,7 +3,7 @@ from typing import List, Tuple
 import numpy as onp
 from svgpathtools import Line
 from svgpathtools import svg_to_paths as sp
-
+import tripy
 from ..sim.jax_geometry import JaxScene, create_polygon, rotate_polygon, create_scene
 
 
@@ -104,23 +104,28 @@ def get_svg_scene(fname: str, px_per_meter: float = 50) -> JaxScene:
             print(f"Only simple line figures are currently allowed, skipping")
             continue
         # TODO: check lines color and set orientation
-        polygon = create_polygon(
-            sort_segments(
-                segments=onp.concatenate(
-                    [
-                        onp.array(line_begin_end(line, px_per_meter, w, h))[onp.newaxis]
-                        for line in path
-                    ],
-                    axis=0,
-                ),
-                orientation="counterclockwise",
-            )
+        onp_polygon = sort_segments(
+            segments=onp.concatenate(
+                [onp.array(line_begin_end(line, px_per_meter, w, h))[onp.newaxis] for line in path],
+                axis=0,
+            ),
+            orientation="counterclockwise",
         )
-
-        if "transform" in attr and "rotate" in attr["transform"]:
-            angle, cx, cy = eval(attr["transform"].replace("rotate", ""))
-            cx, cy = cx, h - cy
-            polygon = rotate_polygon(polygon, angle, (cx / px_per_meter, cy / px_per_meter))
-        polygons.append(polygon)
+        # triangulate:
+        polygon_points = [s[0] for s in onp_polygon]
+        triangles_points = tripy.earclip(polygon_points)
+        idxs = onp.array([0, 1, 2])
+        for triangle in triangles_points:
+            segments = onp.zeros((3, 2, 2), dtype=onp_polygon.dtype)
+            segments[:, 0] = onp.asarray(triangle)
+            segments[:, 1] = segments[(idxs + 1) % 3, 0]
+            jax_polygon = create_polygon(segments)
+            if "transform" in attr and "rotate" in attr["transform"]:
+                angle, cx, cy = eval(attr["transform"].replace("rotate", ""))
+                cx, cy = cx, h - cy
+                jax_polygon = rotate_polygon(
+                    jax_polygon, angle, (cx / px_per_meter, cy / px_per_meter)
+                )
+            polygons.append(jax_polygon)
 
     return create_scene(polygons)
