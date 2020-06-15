@@ -1,4 +1,5 @@
 import os
+import time
 
 import numpy as onp
 from svgpathtools import Line, Path, wsvg
@@ -15,16 +16,19 @@ def self_intersects(line, lines):
 
 
 min_num_figures = 2
-max_num_figures = 20
+max_num_figures = 13
 min_edge = .1
 max_edge = 5.
 min_field = -10.
 max_field = 10.
-output_folder = '../assets/'
-num_maps = 100
+output_folder = '../assets/generated/'
+os.makedirs(output_folder, exist_ok=True)
+num_maps = 50
+px_per_meter = 50
 
 def generate_maps(map_id):
-    onp.random.seed(map_id)
+    map_file = os.path.join(output_folder, f"map_{map_id}.svg")
+    onp.random.seed(int(time.time()) + map_id)
     figures = []
     all_lines = []
     num_figures = onp.random.randint(min_num_figures, max_num_figures, 1)[0]
@@ -53,16 +57,36 @@ def generate_maps(map_id):
                 pass
 
         final_line = Line(lines[-1].end, lines[0].start)
-        # TODO do not discard figure, add more points instead
-        if not self_intersects(final_line, all_lines):
+        extra_line = None
+
+        if self_intersects(final_line, all_lines):
+            extra_line = Line(lines[-1].end, lines[0].start)
+            for num_tries in range(10):
+                if self_intersects(final_line, all_lines) or self_intersects(extra_line, all_lines):
+                    direction = onp.random.uniform(min_field, max_field, 2)
+                    step = direction * onp.random.uniform(min_edge, max_edge, 1) / onp.linalg.norm(direction)
+                    interm_point = (prev_line.end.real, prev_line.end.imag) + step
+                    extra_line = Line(lines[-1].end, interm_point[0] + interm_point[1] * 1j)
+                    final_line = Line(interm_point[0] + interm_point[1] * 1j, lines[0].start)
+                else:
+                    lines.append(extra_line)
+                    lines.append(final_line)
+                    figures.append(Path(*lines))
+                    all_lines.append(final_line)
+                    all_lines.append(extra_line)
+                    wsvg(paths=figures, filename=map_file,
+                         dimensions=(px_per_meter * 10, px_per_meter * 10))
+                    break
+
+        else:
             lines.append(final_line)
             figures.append(Path(*lines))
             all_lines.append(final_line)
             wsvg(paths=figures,
-                 filename=os.path.join(output_folder, f"map_{map_id}.svg"),
-                 dimensions=(10, 10))
+                 filename=map_file,
+                 dimensions=(px_per_meter * 10, px_per_meter * 10))
 
 
 if __name__ == '__main__':
-    with Pool(16) as pool:
+    with Pool(4) as pool:
         pool.map(generate_maps, range(num_maps))
