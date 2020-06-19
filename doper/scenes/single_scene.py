@@ -20,7 +20,6 @@ class SingleScene:
             config["sim"]["scene_params"]["svg_scene_path"],
             px_per_meter=config["sim"]["scene_params"]["px_per_meter"],
         )
-        self._onp_segments = onp.asarray(self.jax_scene.segments)
 
     def get_init_state(self, batch_size: int):
         """
@@ -31,10 +30,11 @@ class SingleScene:
         Returns:
             [batch_size, 2] jax array with initial coordinates
         """
+        _onp_segments = onp.asarray(self.jax_scene.segments)
         eps = self.config["constants"]["radius"] / 2
 
-        max_x, min_x = onp.max(self._onp_segments[:, :, 0]), onp.min(self._onp_segments[:, :, 0])
-        max_y, min_y = onp.max(self._onp_segments[:, :, 1]), onp.min(self._onp_segments[:, :, 1])
+        max_x, min_x = onp.max(_onp_segments[:, :, 0]), onp.min(_onp_segments[:, :, 0])
+        max_y, min_y = onp.max(_onp_segments[:, :, 1]), onp.min(_onp_segments[:, :, 1])
         remaining_idxs = np.arange(batch_size)
         init_proposal = onp.random.uniform(
             (min_x - 1, min_y - 1), (max_x + 1, max_y + 1), size=(batch_size, 2)
