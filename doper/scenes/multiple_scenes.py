@@ -11,14 +11,17 @@ from .single_scene import SingleScene
 logger = logging.getLogger(__name__)
 
 
-class MultipleScenes(SingleScene):
+class MultipleScenes():
     def __init__(self, config: dict):
         self.config = config
         scene_paths = glob(config["sim"]["scene_params"]["svg_scene_path"])
-        self.jax_scenes = [
-            get_svg_scene(scene, 
-            px_per_meter=self.config["sim"]["scene_params"]["px_per_meter"],
-            ) for scene in scene_paths]
+        self.single_scenes = []
+        for scene_path in scene_paths:
+            single_config = config.copy()
+            single_config["sim"]["scene_params"]["svg_scene_path"] = scene_path
+            self.single_scenes.append(SingleScene(single_config))
 
-    def _get_scene(self):
-        return self.jax_scenes[onp.random.randint(0, len(self.jax_scenes), 1)[0]]
+    def get_init_state(self, batch_size: int):
+        single_scene = onp.random.choice(self.single_scenes, 1)[0]
+        self.jax_scene = single_scene.jax_scene
+        return single_scene.get_init_state(batch_size)

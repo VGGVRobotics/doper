@@ -16,13 +16,10 @@ logger = logging.getLogger(__name__)
 class SingleScene:
     def __init__(self, config: dict):
         self.config = config
-        self.jax_scenes = [get_svg_scene(
+        self.jax_scene = get_svg_scene(
             config["sim"]["scene_params"]["svg_scene_path"],
             px_per_meter=config["sim"]["scene_params"]["px_per_meter"],
-        )]
-
-    def _get_scene(self):
-        return self.jax_scenes[0]
+        )
 
     def get_init_state(self, batch_size: int):
         """
@@ -33,11 +30,7 @@ class SingleScene:
         Returns:
             [batch_size, 2] jax array with initial coordinates
         """
-        jax_scene = self._get_scene()
-        # range sensing agent uses scene from this class as scene_handler.jax_scene
-        # TODO refactor range sensing agent to get rid of the scene as self.
-        self.jax_scene = jax_scene
-        _onp_segments = onp.asarray(jax_scene.segments)
+        _onp_segments = onp.asarray(self.jax_scene.segments)
         eps = self.config["constants"]["radius"] / 2
 
         max_x, min_x = onp.max(_onp_segments[:, :, 0]), onp.min(_onp_segments[:, :, 0])
@@ -48,9 +41,9 @@ class SingleScene:
         )
         proposal_jax = np.asarray(init_proposal)
         while True:
-            is_inner = if_points_inside_any_polygon(proposal_jax, jax_scene)
+            is_inner = if_points_inside_any_polygon(proposal_jax, self.jax_scene)
             _, distance = find_closest_segment_to_points_batch(
-                proposal_jax, jax_scene.segments
+                proposal_jax, self.jax_scene.segments
             )
             acceptable = onp.asarray(
                 np.logical_not(
