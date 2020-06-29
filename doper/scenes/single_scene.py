@@ -2,6 +2,7 @@ __all__ = ["SingleScene"]
 
 import logging
 import numpy as onp
+import jax
 import jax.numpy as np
 
 from doper.utils.assets import get_svg_scene
@@ -14,14 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 class SingleScene:
-    def __init__(self, config: dict):
+    def __init__(self, config: dict) -> None:
         self.config = config
         self.jax_scene = get_svg_scene(
-            config["sim"]["scene_params"]["svg_scene_path"],
-            px_per_meter=config["sim"]["scene_params"]["px_per_meter"],
+            config["svg_scene_path"], px_per_meter=config["px_per_meter"],
         )
 
-    def get_init_state(self, batch_size: int):
+    def get_init_state(self, batch_size: int) -> jax.numpy.ndarray:
         """
         Returns jax object with initial state
         Args:

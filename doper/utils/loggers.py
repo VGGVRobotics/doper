@@ -37,3 +37,7 @@ def write_output(
     fig.legend()
     plt.savefig(output_file_name)
     plt.close()
+
+
+def log_val_rollout(val_runner, agent, scene_handler, save_dir):
+    pass

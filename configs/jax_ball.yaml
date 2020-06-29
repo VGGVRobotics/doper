@@ -10,9 +10,13 @@ sim:
   sim_time: 0.3
   coordinate_target: [6.0, 4.0]
   attractor_coordinate: [-3.0, 2.0]
-  scene_name: MultipleScenes
-  scene_params:
+  train_scene_name: MultipleScenes
+  train_scene_params:
     svg_scene_path: /Users/gleb-verni-babki-111/code/repos/doper/assets/generated/*.svg
+    px_per_meter: 1
+  val_scene_name: MultipleScenes
+  val_scene_params:
+    svg_scene_path: /Users/gleb-verni-babki-111/code/repos/doper/assets/validation/*.svg
     px_per_meter: 1
   agent_name: RangeSensingAgent
   agent_params:

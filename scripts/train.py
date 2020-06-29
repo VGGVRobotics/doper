@@ -20,9 +20,9 @@ if __name__ == "__main__":
 
     device = config["train"]["device"]
     if "cpu" in device:
-        jax_config.update('jax_platform_name', 'cpu')
+        jax_config.update("jax_platform_name", "cpu")
     elif "cuda" in device:
-        jax_config.update('jax_platform_name', 'gpu')
+        jax_config.update("jax_platform_name", "gpu")
     else:
         raise ValueError(f"Device {device} is not available, use cuda or cpu")
 
@@ -41,8 +41,12 @@ if __name__ == "__main__":
 
     trainer = getattr(trainers, config["train"]["trainer_name"])(config)
     agent = getattr(agents, config["sim"]["agent_name"])(config)
-    scene_handler = getattr(scenes, config["sim"]["scene_name"])(config)
-
+    scene_handler = getattr(scenes, config["sim"]["train_scene_name"])(
+        config["sim"]["train_scene_params"]
+    )
+    val_scene_handler = getattr(scenes, config["sim"]["val_scene_name"])(
+        config["sim"]["val_scene_params"]
+    )
     for iteration in range(config["train"]["n_iters"]):
         loss_val = trainer.optimize_parameters(agent, scene_handler)
         logger.info(f"Iteration {iteration}: Loss {loss_val}")
