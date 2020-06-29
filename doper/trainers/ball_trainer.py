@@ -6,7 +6,7 @@ import jax.numpy as np
 import numpy as onp
 import torch
 
-from doper.networks import LinearReLUController
+from doper.networks import UndirectedLinearReLUController
 from doper.sim.ball_sim import vmapped_grad_and_value, run_sim
 from doper.utils.connectors import jax_grads_to_pytorch, pytorch_to_jax
 
@@ -21,14 +21,14 @@ class BallAttractorTrainer:
         self.constants = self.config["constants"]
         self.constants["volume"] = 4 * np.pi * (self.constants["radius"] ** 3) / 3
         self.constants["mass"] = self.constants["volume"] * self.constants["density"]
-        self.controller = LinearReLUController(config["model"]).to(config["train"]["device"])
+        self.controller = UndirectedLinearReLUController(config["model"]).to(config["train"]["device"])
         self.sim_time = config["sim"]["sim_time"]
         self.n_steps = config["sim"]["n_steps"]
         self.optimizer = torch.optim.Adam(self.controller.parameters())
         self.batch_size = self.config["train"]["batch_size"]
         self.num_actions = self.config["train"]["num_actions"]
 
-    def forward(self, observation, coordinate_init, velocity_init, scene):
+    def forward(self, observation, coordinate_init, velocity_init, direction_init, scene):
         impulse = self.controller(observation.to(self.device))
         final_coordinate, final_velocity, trajectory = run_sim(
             self.sim_time,
@@ -41,6 +41,7 @@ class BallAttractorTrainer:
                     + impulse.cpu() / self.constants["mass"]
                 )[0]
             ),
+            direction_init,
             np.array(self.config["sim"]["attractor_coordinate"]),
             self.constants,
         )
@@ -48,10 +49,13 @@ class BallAttractorTrainer:
 
     def optimize_parameters(self, agent, scene_handler, grad_clip=5):
         coordinate_init = scene_handler.get_init_state(self.batch_size)
+        direction_init = onp.random.uniform(-1, 1, (1, 2))
+        direction_init /= onp.linalg.norm(direction_init, axis=1)[:, None]
+
         self.optimizer.zero_grad()
         velocity_init = onp.random.uniform(-1, 2, (self.batch_size, 2))
         for action_id in range(self.num_actions):
-            observation = agent.get_observations(coordinate_init, velocity_init, scene_handler)
+            observation = agent.get_observations(coordinate_init, velocity_init, direction_init, scene_handler)
 
             impulse = self.controller(observation.to(self.device))
 
@@ -63,6 +67,7 @@ class BallAttractorTrainer:
                 pytorch_to_jax(
                     torch.from_numpy(velocity_init) + impulse.cpu() / self.constants["mass"]
                 ),
+                np.array(self.config["sim"]["direction_init"]),
                 np.array(self.config["sim"]["coordinate_target"]),
                 np.array(self.config["sim"]["attractor_coordinate"]),
                 self.constants,

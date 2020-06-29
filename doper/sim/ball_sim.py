@@ -9,7 +9,7 @@ from jax import lax
 
 from .jax_geometry import find_closest_segment_to_point, compute_segment_projection, JaxScene
 
-BallState = namedtuple("BallState", ["coordinate", "velocity", "acceleration"])
+BallState = namedtuple("BallState", ["coordinate", "velocity", "acceleration", "direction"])
 
 
 def compute_potential_point(coord: Sequence, attractor_coord: Sequence) -> float:
@@ -72,10 +72,15 @@ def get_new_state(current_state: BallState, new_acceleration: Sequence, dt: floa
     Returns:
         named tuple BallState with new state
     """
-    new_velocity = current_state.velocity + new_acceleration * dt
-    new_coordinate = current_state.coordinate + new_velocity * dt
+    tangent_acceleration = current_state.direction * (new_acceleration @ current_state.direction)
+    new_velocity = current_state.velocity + tangent_acceleration * dt
+    tangent_velocity = current_state.direction * (new_velocity @ current_state.direction)
+    new_coordinate = current_state.coordinate + tangent_velocity * dt
     return BallState(
-        coordinate=new_coordinate, velocity=new_velocity, acceleration=new_acceleration
+        coordinate=new_coordinate,
+        velocity=new_velocity,
+        acceleration=new_acceleration,
+        direction=current_state.direction
     )
 
 
@@ -119,7 +124,7 @@ def resolve_collision(args: Sequence):
     velocity_after_impact = projected_v_p - constants["walls_elasticity"] * projected_v_n
     # make final step
     state_after_impact = BallState(
-        sub_state.coordinate, velocity_after_impact, sub_state.acceleration
+        sub_state.coordinate, velocity_after_impact, sub_state.acceleration, current_state.direction
     )
     l2_force = -grad(compute_potential_point)(sub_state.coordinate, attractor)
     friction_force = compute_rolling_friction_force(
@@ -215,6 +220,7 @@ def _run_sim(
     scene: JaxScene,
     coordinate_init: Sequence,
     velocity_init: Sequence,
+    direction_init: Sequence,
     attractor: Sequence,
     constants: dict,
 ) -> Tuple[Sequence, Sequence, Sequence]:
@@ -239,6 +245,7 @@ def _run_sim(
         coordinate=coordinate_init,
         velocity=velocity_init,
         acceleration=np.zeros_like(velocity_init),
+        direction=direction_init
     )
     step = partial(sim_step, scene=scene, attractor=attractor, constants=constants, dt=dt,)
 
@@ -259,6 +266,7 @@ def _compute_loss(
     scene: JaxScene,
     coordinate_init: Sequence,
     velocity_init: Sequence,
+    direction: Sequence,
     target_coordinate: Sequence,
     attractor: Sequence,
     constants: dict,
@@ -281,7 +289,7 @@ def _compute_loss(
         final_velocity: [batch_size, 2] jax array of final velocities
     """
     final_coord, final_velocity, trajectory = run_sim(
-        sim_time, n_steps, scene, coordinate_init, velocity_init, attractor, constants,
+        sim_time, n_steps, scene, coordinate_init, velocity_init, direction, attractor, constants,
     )
     return np.sum(np.abs(final_coord - target_coordinate)), final_coord, final_velocity
 
@@ -292,6 +300,7 @@ def reduce_loss(
     scene: JaxScene,
     coordinate_init: Sequence,
     velocity_init: Sequence,
+    direction: Sequence,
     target_coordinate: Sequence,
     attractor: Sequence,
     constants: dict,
@@ -317,6 +326,7 @@ def reduce_loss(
         scene,
         coordinate_init,
         velocity_init,
+        direction,
         target_coordinate,
         attractor,
         constants,
@@ -329,10 +339,10 @@ run_sim = jax.jit(_run_sim, static_argnums=(0, 1))
 compute_loss = jax.jit(_compute_loss, static_argnums=(0, 1))
 
 #  only coordinate_init and velocity_init are to be vectorized, everything else is to be broadcasted
-vmapped_loss = jax.vmap(compute_loss, in_axes=(None, None, None, 0, 0, None, None, None))
+vmapped_loss = jax.vmap(compute_loss, in_axes=(None, None, None, 0, 0, None, None, None, None))
 
 vmapped_grad_and_value = jax.value_and_grad(
-    lambda s, n, sc, c, v, t, a, constants: reduce_loss(s, n, sc, c, v, t, a, constants),
+    lambda s, n, sc, c, v, dir, t, a, constants: reduce_loss(s, n, sc, c, v, dir, t, a, constants),
     4,
     has_aux=True,
 )

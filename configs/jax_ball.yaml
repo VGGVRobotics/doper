@@ -12,11 +12,12 @@ sim:
   attractor_coordinate: [-3.0, 2.0]
   scene_name: MultipleScenes
   scene_params:
-    svg_scene_path: /Users/gleb-verni-babki-111/code/repos/doper/assets/generated/*.svg
+    svg_scene_path: /home/gleb/code/repos/doper/assets/generated/*.svg
     px_per_meter: 1
-  agent_name: RangeSensingAgent
+  agent_name: DirectedRangeSensingAgent
   agent_params:
     distance_range: 1000
+    angle_range: 120
     angle_step: 20
 
 train:

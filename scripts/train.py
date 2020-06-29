@@ -49,11 +49,13 @@ if __name__ == "__main__":
         if iteration % config["train"]["val_iter"] == 0:
             init_state = scene_handler.get_init_state(1)[[0]]
             velocity_init = onp.zeros_like(init_state)
+            direction_init = onp.random.uniform(-1, 1, (1, 2))
+            direction_init /= onp.linalg.norm(direction_init, axis=1)[:, None]
             trajectories = []
             for i in range(trainer.num_actions):
                 observation = agent.get_observations(init_state, velocity_init, scene_handler)
                 final_coordinate, velocity, trajectory = trainer.forward(
-                    observation, init_state, velocity_init, scene_handler
+                    observation, init_state, velocity_init, direction_init, scene_handler
                 )
                 init_state = final_coordinate.reshape(1, -1)
                 velocity_init = velocity.reshape(1, -1)

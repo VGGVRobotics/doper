@@ -5,7 +5,6 @@ from glob import glob
 
 import numpy as onp
 
-from doper.utils.assets import get_svg_scene
 from .single_scene import SingleScene
 
 logger = logging.getLogger(__name__)
