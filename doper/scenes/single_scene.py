@@ -15,11 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 class SingleScene:
-    def __init__(self, config: dict) -> None:
-        self.config = config
-        self.jax_scene = get_svg_scene(
-            config["svg_scene_path"], px_per_meter=config["px_per_meter"],
-        )
+    def __init__(self, svg_scene_path: str, px_per_meter: int, agent_radius: float) -> None:
+        self.jax_scene = get_svg_scene(svg_scene_path, px_per_meter=px_per_meter)
+        self.agent_radius = agent_radius
 
     def get_init_state(self, batch_size: int) -> jax.numpy.ndarray:
         """
@@ -31,7 +29,7 @@ class SingleScene:
             [batch_size, 2] jax array with initial coordinates
         """
         _onp_segments = onp.asarray(self.jax_scene.segments)
-        eps = self.config["constants"]["radius"] / 2
+        eps = self.agent_radius / 2
 
         max_x, min_x = onp.max(_onp_segments[:, :, 0]), onp.min(_onp_segments[:, :, 0])
         max_y, min_y = onp.max(_onp_segments[:, :, 1]), onp.min(_onp_segments[:, :, 1])
@@ -46,9 +44,7 @@ class SingleScene:
                 proposal_jax, self.jax_scene.segments
             )
             acceptable = onp.asarray(
-                np.logical_not(
-                    np.logical_or(is_inner, distance <= self.config["constants"]["radius"] + eps)
-                )
+                np.logical_not(np.logical_or(is_inner, distance <= self.agent_radius + eps))
             )
             init_proposal[remaining_idxs[acceptable], :] = onp.array(proposal_jax)[acceptable, :]
             if np.all(acceptable):

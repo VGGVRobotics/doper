@@ -8,15 +8,17 @@ constants:
 sim:
   n_steps: 300
   sim_time: 0.3
+  val_n_steps: 3000
+  val_sim_time: 3
   coordinate_target: [6.0, 4.0]
   attractor_coordinate: [-3.0, 2.0]
   train_scene_name: MultipleScenes
   train_scene_params:
-    svg_scene_path: /Users/gleb-verni-babki-111/code/repos/doper/assets/generated/*.svg
+    svg_scene_path: /mnt/hdd/code/doper/assets/generated/*.svg
     px_per_meter: 1
   val_scene_name: MultipleScenes
   val_scene_params:
-    svg_scene_path: /Users/gleb-verni-babki-111/code/repos/doper/assets/validation/*.svg
+    svg_scene_path: /mnt/hdd/code/doper/assets/validation/*.svg
     px_per_meter: 1
   agent_name: RangeSensingAgent
   agent_params:
@@ -32,6 +34,7 @@ train:
   output_folder: ./output/
   batch_size: 16
   num_actions: 8
+  val_num_actions: 80
 
 model:
   input_dim: 25

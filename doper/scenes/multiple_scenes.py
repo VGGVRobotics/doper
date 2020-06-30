@@ -6,22 +6,21 @@ from glob import glob
 import jax
 import numpy as onp
 
-from doper.utils.assets import get_svg_scene
 from .single_scene import SingleScene
 
 logger = logging.getLogger(__name__)
 
 
 class MultipleScenes:
-    def __init__(self, config: dict) -> None:
-        self.config = config
-        scene_paths = glob(config["svg_scene_path"])
-        print(scene_paths)
+    def __init__(self, svg_scene_path: str, px_per_meter: int, agent_radius: float) -> None:
+        scene_paths = glob(svg_scene_path)
         self.single_scenes = []
         for scene_path in scene_paths:
-            single_config = config.copy()
-            single_config["svg_scene_path"] = scene_path
-            self.single_scenes.append(SingleScene(single_config))
+            self.single_scenes.append(
+                SingleScene(
+                    svg_scene_path=scene_path, px_per_meter=px_per_meter, agent_radius=agent_radius
+                )
+            )
 
     def get_init_state(self, batch_size: int) -> jax.numpy.ndarray:
         single_scene = onp.random.choice(self.single_scenes, 1)[0]
@@ -31,4 +30,3 @@ class MultipleScenes:
     def __iter__(self):
         for scene in self.single_scenes:
             yield scene
-

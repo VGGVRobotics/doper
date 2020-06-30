@@ -40,15 +40,26 @@ if __name__ == "__main__":
     logger = logging.getLogger("root")
 
     trainer = getattr(trainers, config["train"]["trainer_name"])(config)
+    # var A shitlike
+    val_cfg = config.copy()
+    val_cfg["n_steps"] = config["sim"]["val_n_steps"]
+    val_cfg["sim_time"] = config["sim"]["val_sim_time"]
+    val_cfg["train"]["num_actions"] = config["train"]["val_num_actions"]
+    val_runner = getattr(trainers, config["train"]["trainer_name"])(val_cfg)
     agent = getattr(agents, config["sim"]["agent_name"])(config)
+    # var B a bit better
     scene_handler = getattr(scenes, config["sim"]["train_scene_name"])(
-        config["sim"]["train_scene_params"]
+        config["sim"]["train_scene_params"]["svg_scene_path"],
+        config["sim"]["train_scene_params"]["px_per_meter"],
+        config["constants"]["radius"],
     )
     val_scene_handler = getattr(scenes, config["sim"]["val_scene_name"])(
-        config["sim"]["val_scene_params"]
+        config["sim"]["val_scene_params"]["svg_scene_path"],
+        config["sim"]["val_scene_params"]["px_per_meter"],
+        config["constants"]["radius"],
     )
     for iteration in range(config["train"]["n_iters"]):
         loss_val = trainer.optimize_parameters(agent, scene_handler)
         logger.info(f"Iteration {iteration}: Loss {loss_val}")
         if iteration % config["train"]["val_iter"] == 0:
-            log_val_rollout(trainer, agent, val_scene_handler, output_folder, iteration, config)
+            log_val_rollout(val_runner, agent, val_scene_handler, output_folder, iteration, config)
