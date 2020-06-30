@@ -6,7 +6,7 @@ import jax.numpy as np
 import numpy as onp
 import torch
 
-from doper.networks import UndirectedLinearReLUController
+from doper import networks
 from doper.sim.ball_sim import vmapped_grad_and_value, run_sim
 from doper.utils.connectors import jax_grads_to_pytorch, pytorch_to_jax
 
@@ -21,7 +21,7 @@ class BallAttractorTrainer:
         self.constants = self.config["constants"]
         self.constants["volume"] = 4 * np.pi * (self.constants["radius"] ** 3) / 3
         self.constants["mass"] = self.constants["volume"] * self.constants["density"]
-        self.controller = UndirectedLinearReLUController(config["model"]).to(config["train"]["device"])
+        self.controller = getattr(networks, config["model"]["controller_name"])(config["model"]).to(config["train"]["device"])
         self.sim_time = config["sim"]["sim_time"]
         self.n_steps = config["sim"]["n_steps"]
         self.optimizer = torch.optim.Adam(self.controller.parameters())
@@ -49,7 +49,7 @@ class BallAttractorTrainer:
 
     def optimize_parameters(self, agent, scene_handler, grad_clip=5):
         coordinate_init = scene_handler.get_init_state(self.batch_size)
-        direction_init = onp.random.uniform(-1, 1, (1, 2))
+        direction_init = onp.ones_like(coordinate_init)
         direction_init /= onp.linalg.norm(direction_init, axis=1)[:, None]
 
         self.optimizer.zero_grad()
