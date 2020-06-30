@@ -7,7 +7,7 @@ import numpy as onp
 from jax.config import config as jax_config
 
 from doper import trainers, agents, scenes
-from doper.utils.loggers import write_output
+from doper.utils.loggers import write_output, log_val_rollout
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -51,20 +51,4 @@ if __name__ == "__main__":
         loss_val = trainer.optimize_parameters(agent, scene_handler)
         logger.info(f"Iteration {iteration}: Loss {loss_val}")
         if iteration % config["train"]["val_iter"] == 0:
-            init_state = scene_handler.get_init_state(1)[[0]]
-            velocity_init = onp.zeros_like(init_state)
-            trajectories = []
-            for i in range(trainer.num_actions):
-                observation = agent.get_observations(init_state, velocity_init, scene_handler)
-                final_coordinate, velocity, trajectory = trainer.forward(
-                    observation, init_state, velocity_init, scene_handler
-                )
-                init_state = final_coordinate.reshape(1, -1)
-                velocity_init = velocity.reshape(1, -1)
-                trajectories.append(trajectory.coordinate)
-            write_output(
-                onp.concatenate(trajectories),
-                os.path.join(output_folder, f"trajectory_iter_{iteration}.jpg"),
-                scene_handler,
-                config,
-            )
+            log_val_rollout(trainer, agent, val_scene_handler, output_folder, iteration, config)

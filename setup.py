@@ -9,7 +9,7 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "taichi==0.6.6",
-        "torch==1.4.0",
+        "torch==1.5.1",
         "numpy==1.18.1",
         "jax==0.1.68",
         "jaxlib==0.1.47",

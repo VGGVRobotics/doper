@@ -39,5 +39,23 @@ def write_output(
     plt.close()
 
 
-def log_val_rollout(val_runner, agent, scene_handler, save_dir):
-    pass
+def log_val_rollout(trainer, agent, val_scene_handler, output_folder, iteration, config):
+    for scene_num, scene_handler in enumerate(val_scene_handler):
+        init_state = scene_handler.get_init_state(1)[[0]]
+        velocity_init = onp.zeros_like(init_state)
+        trajectories = []
+        for i in range(trainer.num_actions):
+            observation = agent.get_observations(init_state, velocity_init, scene_handler)
+            final_coordinate, velocity, trajectory = trainer.forward(
+                observation, init_state, velocity_init, scene_handler
+            )
+            init_state = final_coordinate.reshape(1, -1)
+            velocity_init = velocity.reshape(1, -1)
+            trajectories.append(trajectory.coordinate)
+        write_output(
+            onp.concatenate(trajectories),
+            os.path.join(output_folder, f"scene_{scene_num}_trajectory_iter_{iteration}.jpg"),
+            scene_handler,
+            config,
+        )
+

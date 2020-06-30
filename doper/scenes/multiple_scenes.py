@@ -16,6 +16,7 @@ class MultipleScenes:
     def __init__(self, config: dict) -> None:
         self.config = config
         scene_paths = glob(config["svg_scene_path"])
+        print(scene_paths)
         self.single_scenes = []
         for scene_path in scene_paths:
             single_config = config.copy()
@@ -29,5 +30,5 @@ class MultipleScenes:
 
     def __iter__(self):
         for scene in self.single_scenes:
-            yield scene.get_init_state(1)
+            yield scene
 
