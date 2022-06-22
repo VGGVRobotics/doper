@@ -9,7 +9,7 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "torch==1.4.0",
-        "numpy==1.18.1",
+        "numpy==1.22.0",
         "jax==0.1.68",
         "jaxlib==0.1.47",
         "svgpathtools==1.3.3",
