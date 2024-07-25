@@ -8,7 +8,7 @@ setup(
     packages=find_packages(),
     python_requires=">=3.6",
     install_requires=[
-        "torch==1.4.0",
+        "torch==2.2.0",
         "numpy==1.18.1",
         "jax==0.1.68",
         "jaxlib==0.1.47",
